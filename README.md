@@ -1,29 +1,27 @@
-# Instagram Plus Web
+# Instagram Plus
 
-A lightweight Tampermonkey / Greasemonkey userscript that adds a few useful Instagram Plus-style features to Instagram Web.
+Simple extras for Instagram on the web, with controls that fit into Instagram's UI.
 
 ## Features
 
-- Custom bio fonts
-- Search your Story viewers
-- Anonymous Story viewing toggle
-- Followers / Following comparison
-- Clean draggable IG+ menu
-- Automatic light and dark mode
+- **Downloads:** save stories, posts, reels and carousel items.
+- **Compare:** see who doesn't follow you back and who you don't follow back.
+- **Activity:** track changes to your followers and following.
+- **Viewer search:** search your story's viewer list.
+- **Bio fonts:** style your bio text.
+- **Story Preview:** try viewing stories without marking them seen. Anonymous viewing isn't guaranteed.
 
-## Installation
+Activity checks run about every 15 minutes while Instagram is visible. The first check starts tracking.
 
-1. Install **Tampermonkey** or another compatible userscript manager.
-2. Install the `instagram-plus-web.user.js` script.
-3. Open [Instagram](https://www.instagram.com/).
-4. Use the **IG+** button to enable or use features.
+## Install
 
-## Notes
+1. Install [Tampermonkey](https://www.tampermonkey.net/) in your browser.
+2. Open [instagram-plus-web.user.js](instagram-plus-web.user.js) and copy the code.
+3. Create a new script in Tampermonkey, replace its contents with the code, and save.
+4. Open or reload [Instagram](https://www.instagram.com/).
 
-- Made for Instagram Web.
-- Everything is handled locally in your browser.
-- Instagram may change its website at any time, which can temporarily break some features.
+Use the movable **IG+ circle** to toggle features. Download arrows appear beside posts, reels and story controls.
 
-## Author
+**Updating?** Replace the code in your existing script, save, and reload Instagram. Keep only one copy enabled.
 
-Made by **Jasermomm**
+Made by **Jasermomm**.
