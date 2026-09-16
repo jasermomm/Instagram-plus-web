@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Instagram Plus (Web)
 // @namespace    https://greasyfork.org/
-// @version      1.8.2
-// @description  Instagram Web enhancements: story, post and reel downloads, follow/unfollow alerts, bio fonts, Story viewer search, and follower comparison.
+// @version      1.9.0
+// @description  Instagram Web enhancements: media zoom, video controls, quick downloads, save all stories, follow/unfollow alerts, bio fonts, viewer search and follower comparison.
 // @author       Jasermomm
 // @match        https://www.instagram.com/*
 // @icon         https://www.instagram.com/static/images/ico/favicon-200.png/ab6eff595bb1.png
@@ -24,7 +24,7 @@
   'use strict';
 
   const APP = 'igp-web';
-  const VERSION = '1.8.2';
+  const VERSION = '1.9.0';
   const PAGE = typeof unsafeWindow === 'undefined' ? window : unsafeWindow;
   const pageFunction = fn => typeof exportFunction === 'function' ? exportFunction(fn, PAGE) : fn;
   const SETTINGS_KEY = `${APP}:settings:v2`;
@@ -37,6 +37,8 @@
     storyDownloads: true,
     postDownloads: true,
     reelDownloads: true,
+    mediaViewer: true,
+    videoControls: true,
     desktopNotifications: false,
   });
 
@@ -60,6 +62,9 @@
     relationshipNextCheck: 0,
     mediaBindings: new Map(),
     mediaController: null,
+    mediaJobKey: null,
+    viewerController: null,
+    videoPreferencesApplied: new WeakMap(),
     failedMediaURLs: new Set(),
     modalClosers: new Map(),
   };
@@ -181,6 +186,17 @@
   const ICONS = Object.freeze({
     plus: '<rect x="4" y="4" width="16" height="16" rx="5"/><path d="M12 8v8m-4-4h8"/>',
     download: '<path d="M12 3v12m-5-5 5 5 5-5M4 16v4h16v-4"/>',
+    downloadAll: '<path d="M8 3H3v14h3m2-10h13v14H8Z M14.5 10v7m-3-3 3 3 3-3"/>',
+    expand: '<path d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6"/>',
+    controls: '<path d="M4 6h16M4 12h16M4 18h16M8 3v6m8 0v6m-6 0v6"/>',
+    play: '<path d="m8 5 11 7-11 7Z"/>',
+    pause: '<path d="M8 5v14M16 5v14"/>',
+    pip: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 11h7v7h-7Z"/>',
+    volume: '<path d="M3 9h4l5-4v14l-5-4H3Zm13-1a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>',
+    minus: '<path d="M5 12h14"/>',
+    zoom: '<path d="M5 12h14M12 5v14"/>',
+    previous: '<path d="m15 5-7 7 7 7"/>',
+    next: '<path d="m9 5 7 7-7 7"/>',
     activity: '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/>',
     compare: '<path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4"/>',
     story: '<circle cx="12" cy="12" r="9" stroke-dasharray="11 3"/><circle cx="12" cy="12" r="5"/>',
@@ -372,7 +388,7 @@
     const hadFocus = panel.contains(state.root.activeElement);
     panel.classList.toggle('open',state.panelOpen); panel.inert = !state.panelOpen;
     state.root.getElementById('igp-launcher').setAttribute('aria-expanded',String(state.panelOpen));
-    const rows = [['bioFonts','Bio fonts'],['viewerSearch','Viewer search'],['relationshipNotifier','Activity alerts'],['storyPreview','Story preview']];
+    const rows = [['mediaViewer','Media viewer'],['videoControls','Video controls'],['bioFonts','Bio fonts'],['viewerSearch','Viewer search'],['relationshipNotifier','Activity alerts'],['storyPreview','Story preview']];
     panel.innerHTML = `<div class="head"><span class="title">Instagram Plus</span><span class="version">${VERSION}</span></div>
       <div class="quick-actions"><button id="igp-activity" class="menu-action" type="button">${icon('activity',19)} Activity</button><button id="igp-compare-followers" class="menu-action" type="button" ${state.followerCompareRunning ? 'disabled' : ''}>${icon('compare',19)} ${state.followerCompareRunning ? 'Loading…' : 'Compare'}</button></div>
       <div class="download-settings"><div class="section-label">Downloads<button id="igp-download-current" class="igp-icon-btn" aria-label="Download current media" title="Download current media" type="button">${icon('download',18)}</button></div><div class="download-toggles">
@@ -403,6 +419,7 @@
     clearMediaButtons();
     state.mediaController?.abort();
     removeModal('igp-media-modal');
+    removeModal('igp-viewer-modal');
   }
 
   // ---------------------------------------------------------------------------
@@ -456,7 +473,7 @@
     });
     backdrop.addEventListener('keydown', event => {
       if (event.key !== 'Tab') return;
-      const focusable = [...backdrop.querySelectorAll('button:not(:disabled),input:not(:disabled),a[href]')];
+      const focusable = [...backdrop.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),a[href],[tabindex="0"]')].filter(isVisible);
       const first = focusable[0], last = focusable.at(-1);
       if (event.shiftKey && state.root.activeElement === first) { event.preventDefault(); last?.focus(); }
       else if (!event.shiftKey && state.root.activeElement === last) { event.preventDefault(); first?.focus(); }
@@ -1308,6 +1325,7 @@
       state.compareController?.abort();
       state.mediaController?.abort();
       removeModal('igp-media-modal');
+      removeModal('igp-viewer-modal');
       removeModal('igp-follow-compare-modal');
       scheduleScan();
       state.root?.getElementById('igp-toasts')?.remove();
@@ -1553,7 +1571,7 @@
     if (!reference) {
       if (!/^\/reels?\/?$/.test(location.pathname)) {
         if (location.pathname.startsWith('/direct/') || location.pathname.startsWith('/stories/')) return null;
-        const candidates = [...document.querySelectorAll('article')].map(scope => ({ scope, reference: articleReference(scope) })).filter(target => target.reference && mediaEnabled(target.reference) && visibleIntersection(target.scope) > 0);
+        const candidates = [...document.querySelectorAll('article')].map(scope => ({ scope, reference: articleReference(scope) })).filter(target => target.reference && visibleIntersection(target.scope) > 0);
         return candidates.sort((a,b) => visibleIntersection(b.scope) - visibleIntersection(a.scope))[0] || null;
       }
       const videos = [...document.querySelectorAll('main video, [role="main"] video')].filter(video => visibleMediaArea(video));
@@ -1593,7 +1611,7 @@
       if (!scope.isConnected || articleReference(scope)?.key !== target.reference.key) return null;
     } else {
       if (current?.key !== target.reference.key) return null;
-      scope = [...document.querySelectorAll('[role="dialog"]')].find(isVisible) || document.querySelector('main,[role="main"]');
+      scope = current.kind === 'story' ? mediaSurface(target) : [...document.querySelectorAll('[role="dialog"]')].find(isVisible) || document.querySelector('main,[role="main"]');
       if (!scope) return null;
     }
     const allVideos = [...scope.querySelectorAll('video')];
@@ -1775,20 +1793,24 @@
     try { anchor.click(); } finally { anchor.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000); }
   }
 
-  async function openMediaDownload(target) {
+  async function openMediaDownload(target, { allStories = false } = {}) {
     if (!mediaEnabled(target?.reference)) return;
+    const jobKey = allStories ? `stories:${normalizeUsername(target.reference.username)}` : target.reference.key;
+    if (state.mediaJobKey === jobKey && state.mediaController && !state.mediaController.signal.aborted) return;
     state.mediaController?.abort();
+    removeModal('igp-media-modal');
     const controller = new AbortController();
     const accountId = loggedInAccountID();
     state.mediaController = controller;
+    state.mediaJobKey = jobKey;
     state.panelOpen = false; renderPanel();
-    const modal = createModalShell('igp-media-modal', `Download ${target.reference.kind}`, { onClose: () => {
+    const modal = createModalShell('igp-media-modal', allStories ? 'Download stories' : `Download ${target.reference.kind}`, { onClose: () => {
       controller.abort();
-      if (state.mediaController === controller) state.mediaController = null;
+      if (state.mediaController === controller) { state.mediaController = null; state.mediaJobKey = null; }
     } });
     modal.body.innerHTML = '<div class="igp-progress" role="status"><div class="igp-spinner"></div>Loading…</div>';
     try {
-      const resolved = await resolveMedia(target,controller.signal);
+      const resolved = allStories ? await resolveAllStories(target,accountId,controller.signal) : await resolveMedia(target,controller.signal);
       if (controller.signal.aborted || !modal.backdrop.isConnected) return;
       const { items } = resolved;
       const note = document.createElement('div');
@@ -1805,6 +1827,7 @@
         let completed = 0;
         try {
           for (const item of selection) {
+            if (controller.signal.aborted) throw new DOMException('Cancelled','AbortError');
             note.textContent = `Saving ${item.index}/${items.length}…`;
             await saveMediaItem(target.reference,item,accountId,controller.signal);
             saved.add(item.index); completed++;
@@ -1812,6 +1835,7 @@
           }
           note.textContent = `${completed} ${completed === 1 ? 'file' : 'files'} sent to Downloads`;
           note.title = 'If prompted, allow multiple downloads in your browser.';
+          if (items.length === 1 && !allStories) { modal.close(); showToast('Sent to Downloads'); return; }
           for (const button of buttons) if (saved.has(Number(button.dataset.index))) {
             button.dataset.saved = 'true';
             button.querySelector('svg')?.remove(); button.insertAdjacentHTML('afterbegin',icon('check',18));
@@ -1843,13 +1867,211 @@
         });
         buttons.push(all); actions.prepend(all);
       }
+      if (allStories || items.length === 1) await download(items);
     } catch (error) {
       if (!controller.signal.aborted) modal.body.innerHTML = `<div class="igp-note" role="alert">${escapeHTML(error.message || 'Could not load this media. Try again.')}</div>`;
     }
   }
 
+  async function resolveAllStories(target, accountId, signal) {
+    const reference = target.reference;
+    if (reference.kind !== 'story' || !reference.username) throw new Error('Open someone’s stories first.');
+    // A fresh owner page is required: the current player cache may contain just
+    // one story, and a numeric route identifies only the currently selected one.
+    const records = await fetchMediaPage(reference,accountId,signal);
+    const result = matchMediaRecords(records,{...reference,id:null},null);
+    if (!result?.items.length) throw new Error('Instagram did not return this account’s stories. Reload their stories and retry.');
+    return result;
+  }
+
+  const PLAYBACK_KEY = `${APP}:playback:v1`;
+  function playbackPreferences() {
+    const stored = loadJSON(PLAYBACK_KEY,null) || {};
+    return {
+      speed: typeof stored.speed === 'number' && Number.isFinite(stored.speed) ? clamp(stored.speed,0.25,3) : 1,
+      volume: typeof stored.volume === 'number' && Number.isFinite(stored.volume) ? clamp(stored.volume,0,1) : null,
+    };
+  }
+
+  function applyPlaybackPreferences(video) {
+    const source = video.currentSrc || video.src;
+    if (state.videoPreferencesApplied.get(video) === source) return;
+    state.videoPreferencesApplied.set(video,source);
+    const prefs = playbackPreferences();
+    video.playbackRate = prefs.speed;
+    // Keep Instagram's mute state. Remembering volume must not unexpectedly
+    // unmute the next reel or start autoplay with sound.
+    if (prefs.volume !== null) video.volume = prefs.volume;
+  }
+
+  function mediaSurface(target) {
+    if (target.scope?.isConnected) return target.scope;
+    if (target.reference.kind === 'story') {
+      let parent = storyControlScope();
+      for (let depth=0; parent && depth<9; depth++,parent=parent.parentElement) {
+        if ([...parent.querySelectorAll('video,img')].some(el=>visibleMediaArea(el))) return parent;
+      }
+      return null;
+    }
+    return [...document.querySelectorAll('[role="dialog"],main,[role="main"]')].find(inMediaViewport) || null;
+  }
+
+  function targetVideo(target) {
+    if (target.video?.isConnected && visibleMediaArea(target.video)) return target.video;
+    const videos = [...(mediaSurface(target)?.querySelectorAll('video') || [])].filter(video => {
+      const article = video.closest('article');
+      return visibleMediaArea(video) && (!article || articleReference(article)?.key === target.reference.key);
+    });
+    return videos.length === 1 ? videos[0] : null;
+  }
+
+  const PLAYER_CSS = `
+    .igp-player{box-sizing:border-box;display:grid;gap:8px;padding:10px;border:1px solid var(--bd);border-radius:10px;background:var(--bg);color:var(--fg);font:12px/1.4 ${UI_FONT};width:280px;max-width:calc(100vw - 32px)}
+    .igp-player *{box-sizing:border-box}.igp-player .line{display:flex;align-items:center;gap:6px;min-width:0}.igp-player input[type=range]{min-width:0;width:100%;accent-color:#0095f6;cursor:pointer;height:20px;margin:0}.igp-player .time{margin-left:auto;font-variant-numeric:tabular-nums;white-space:nowrap;font-size:11px}
+    .igp-player button{border:0;background:transparent;color:inherit;display:grid;place-items:center;width:28px;height:28px;padding:4px;border-radius:5px;flex:0 0 auto;cursor:pointer}.igp-player button:hover{background:var(--soft2)}.igp-player button:disabled{opacity:.35;cursor:default}.igp-player select{color:inherit;background:var(--soft);border:1px solid var(--bd);border-radius:5px;padding:3px;font:inherit;width:65px}.igp-player [role=status]:empty{display:none}.igp-player [role=status]{font-size:11px}
+  `;
+
+  function makeVideoControls(video) {
+    const element = document.createElement('div'); element.className='igp-player';
+    element.setAttribute('role','group'); element.setAttribute('aria-label','Video controls');
+    const button=(action,label,name)=>`<button type="button" data-action="${action}" aria-label="${label}" title="${label}">${icon(name,18)}</button>`;
+    element.innerHTML=`<input type="range" min="0" max="1" step="0.01" value="0" aria-label="Seek video" disabled>
+      <div class="line">${button('play','Play','play')}${button('back','Back 5 seconds','previous')}${button('forward','Forward 5 seconds','next')}<select aria-label="Playback speed">${[0.25,0.5,0.75,1,1.25,1.5,1.75,2,2.5,3].map(n=>`<option value="${n}">${n}×</option>`).join('')}</select><span class="time"></span></div>
+      <div class="line">${button('mute','Unmute','volume')}<input type="range" min="0" max="1" step="0.01" aria-label="Volume">${button('step','Step 1/30 second','next')}${button('pip','Picture in picture','pip')}</div><span role="status"></span>`;
+    const lifetime=new AbortController(), opts={signal:lifetime.signal};
+    const seek=element.querySelector('[aria-label="Seek video"]'), volume=element.querySelector('[aria-label="Volume"]'), speed=element.querySelector('select');
+    const play=element.querySelector('[data-action="play"]'), mute=element.querySelector('[data-action="mute"]'), pip=element.querySelector('[data-action="pip"]');
+    const status=element.querySelector('[role="status"]');
+    const time=n=>Number.isFinite(n)?`${Math.floor(n/60)}:${String(Math.floor(n%60)).padStart(2,'0')}`:'0:00';
+    const remember=()=>saveJSON(PLAYBACK_KEY,{speed:video.playbackRate,volume:video.volume});
+    const update=()=>{
+      applyPlaybackPreferences(video);
+      const finite=Number.isFinite(video.duration)&&video.duration>0;
+      seek.disabled=!finite;seek.max=finite?video.duration:1;seek.value=finite?video.currentTime:0;
+      element.querySelector('.time').textContent=`${time(video.currentTime)} / ${finite?time(video.duration):'—'}`;
+      if (play.dataset.paused!==String(video.paused)) { play.dataset.paused=String(video.paused);play.innerHTML=icon(video.paused?'play':'pause',18);play.setAttribute('aria-label',video.paused?'Play':'Pause');play.title=play.getAttribute('aria-label'); }
+      mute.setAttribute('aria-label',video.muted?'Unmute':'Mute');mute.title=video.muted?'Unmute':'Mute';mute.style.opacity=video.muted?'.5':'1';
+      volume.value=video.volume;speed.value=String(video.playbackRate);
+      element.querySelector('[data-action="step"]').disabled=!video.paused||!finite;
+      for(const action of ['back','forward']) element.querySelector(`[data-action="${action}"]`).disabled=!finite;
+      pip.hidden=!(document.pictureInPictureEnabled&&typeof video.requestPictureInPicture==='function');
+      pip.disabled=video.readyState<1||video.disablePictureInPicture;
+    };
+    const seekTo=time=>{if(Number.isFinite(video.duration)&&video.duration>0)video.currentTime=clamp(time,0,video.duration);update();};
+    seek.addEventListener('input',()=>seekTo(Number(seek.value)),opts);
+    volume.addEventListener('input',()=>{video.volume=Number(volume.value);video.muted=video.volume===0;remember();update();},opts);
+    speed.addEventListener('change',()=>{video.playbackRate=Number(speed.value);remember();update();},opts);
+    element.addEventListener('click',async event=>{
+      const action=event.target.closest('button')?.dataset.action;if(!action)return;
+      event.stopPropagation();status.textContent='';
+      try {
+        if(action==='play'){if(video.paused)await video.play();else video.pause();}
+        if(action==='back')seekTo(video.currentTime-5);
+        if(action==='forward')seekTo(video.currentTime+5);
+        if(action==='step'&&video.paused)seekTo(video.currentTime+1/30);
+        if(action==='mute'){video.muted=!video.muted;update();}
+        if(action==='pip'){if(document.pictureInPictureElement===video)await document.exitPictureInPicture();else await video.requestPictureInPicture();}
+      }catch{status.textContent=action==='pip'?'Picture in picture is unavailable.':'This video is not ready. Try again.';}
+      update();
+    },opts);
+    for(const type of ['timeupdate','durationchange','loadedmetadata','play','pause','volumechange','ratechange','emptied','enterpictureinpicture','leavepictureinpicture']) video.addEventListener(type,update,opts);
+    applyPlaybackPreferences(video);update();
+    return {element,dispose:()=>lifetime.abort()};
+  }
+
+  function viewerGeometry(width,height,boxWidth,boxHeight,rotation,zoom,x,y) {
+    const rotated=Math.abs(rotation%180)===90, w=rotated?height:width,h=rotated?width:height;
+    const fit=Math.min(boxWidth/Math.max(w,1),boxHeight/Math.max(h,1),1);
+    const scale=fit*clamp(zoom,1,8),limitX=Math.max(0,(w*scale-boxWidth)/2),limitY=Math.max(0,(h*scale-boxHeight)/2);
+    return {scale,x:clamp(x,-limitX,limitX),y:clamp(y,-limitY,limitY)};
+  }
+
+  async function openMediaViewer(target) {
+    if (!target?.reference || !state.settings.mediaViewer) return;
+    removeModal('igp-viewer-modal');
+    const controller=new AbortController(),account=loggedInAccountID();state.viewerController=controller;
+    let itemCleanup=()=>{}, resizeObserver;
+    const sourceVideo=targetVideo(target);const resume=sourceVideo&&!sourceVideo.paused;const source=sourceVideo?.currentSrc;const path=location.pathname;
+    if(resume)sourceVideo.pause();
+    const modal=createModalShell('igp-viewer-modal','Media',{onClose:()=>{
+      controller.abort();itemCleanup();resizeObserver?.disconnect();if(state.viewerController===controller)state.viewerController=null;
+      if(resume&&sourceVideo.isConnected&&sourceVideo.currentSrc===source&&location.pathname===path&&loggedInAccountID()===account&&inMediaViewport(sourceVideo))void sourceVideo.play().catch(()=>{});
+    }});
+    state.panelOpen=false;renderPanel();
+    const style=document.createElement('style');style.textContent=`${PLAYER_CSS}
+      #igp-viewer-modal .igp-modal{width:min(1100px,calc(100vw - 24px));height:calc(100dvh - 40px);max-height:900px;display:flex;flex-direction:column}#igp-viewer-modal .igp-modal-body{padding:0;display:flex;flex:1;min-height:0;flex-direction:column;overflow:hidden}
+      .igp-stage{position:relative;overflow:hidden;background:#101010;flex:1;min-height:120px;touch-action:none;outline-offset:-3px!important}.igp-stage img{position:absolute;left:50%;top:50%;max-width:none;max-height:none;user-select:none;pointer-events:none;transform-origin:center;will-change:transform}.igp-stage video{width:100%;height:100%;object-fit:contain}.igp-stage[data-zoomed=true]{cursor:grab}.igp-stage:active{cursor:grabbing}
+      .igp-viewer-tools{display:flex;align-items:center;justify-content:center;gap:5px;padding:7px;flex-wrap:wrap;border-top:1px solid var(--bd)}.igp-viewer-tools button{display:grid;place-items:center;border:0;border-radius:6px;background:transparent;padding:7px;min-width:32px;height:34px;color:inherit}.igp-viewer-tools button:hover{background:var(--soft)}.igp-viewer-count{font-size:12px;font-variant-numeric:tabular-nums;min-width:40px;text-align:center}#igp-viewer-modal .igp-player{width:100%;max-width:none;border:0;border-radius:0;padding:8px 14px}#igp-viewer-modal [hidden]{display:none!important}
+      @media(max-width:480px){#igp-viewer-modal{padding:8px}#igp-viewer-modal .igp-modal{width:100%;height:calc(100dvh - 16px)}}`;
+    modal.backdrop.appendChild(style);
+    modal.body.innerHTML='<div class="igp-progress" role="status"><div class="igp-spinner"></div>Loading…</div>';
+    try {
+      const resolved=await resolveMedia(target,controller.signal);
+      if(controller.signal.aborted||account!==loggedInAccountID())return;
+      const items=resolved.items;
+      modal.body.innerHTML='<div class="igp-stage" tabindex="0" aria-label="Media viewer. Scroll to zoom, drag to pan; plus, minus and zero to zoom or fit."></div><div class="igp-viewer-tools"></div><div class="igp-viewer-player"></div>';
+      const stage=modal.body.querySelector('.igp-stage'),toolbar=modal.body.querySelector('.igp-viewer-tools'),playerSlot=modal.body.querySelector('.igp-viewer-player');
+      const add=(label,name,run)=>{const button=document.createElement('button');button.type='button';button.title=label;button.setAttribute('aria-label',label);button.innerHTML=icon(name,20);button.onclick=run;toolbar.appendChild(button);return button;};
+      let index=0,zoom=1,x=0,y=0,rotation=0,media;
+      const draw=()=>{
+        if(!media||items[index].kind!=='image')return;
+        const w=media.naturalWidth||items[index].width||stage.clientWidth,h=media.naturalHeight||items[index].height||stage.clientHeight;
+        const geometry=viewerGeometry(w,h,stage.clientWidth,stage.clientHeight,rotation,zoom,x,y);x=geometry.x;y=geometry.y;
+        media.style.width=`${w}px`;media.style.height=`${h}px`;media.style.transform=`translate(-50%,-50%) translate(${x}px,${y}px) rotate(${rotation}deg) scale(${geometry.scale})`;
+        stage.dataset.zoomed=String(zoom>1);fit.textContent=zoom===1?'Fit':`${Math.round(zoom*100)}%`;
+      };
+      const zoomTo=(value,px=0,py=0)=>{const next=clamp(value,1,8),ratio=next/zoom;x=px-(px-x)*ratio;y=py-(py-y)*ratio;zoom=next;draw();};
+      const previous=add('Previous item','previous',()=>show(index-1));
+      const count=document.createElement('span');count.className='igp-viewer-count';count.setAttribute('aria-live','polite');toolbar.appendChild(count);
+      const next=add('Next item','next',()=>show(index+1));
+      const minus=add('Zoom out','minus',()=>zoomTo(zoom/1.5));
+      const fit=add('Fit media','expand',()=>{zoom=1;x=y=0;draw();});
+      const plus=add('Zoom in','zoom',()=>zoomTo(zoom*1.5));
+      const rotate=add('Rotate','refresh',()=>{rotation=(rotation+90)%360;x=y=0;draw();});
+      const save=add('Download this item','download',async()=>{
+        save.disabled=true;
+        try{await saveMediaItem(target.reference,items[index],account,controller.signal);showToast('Sent to Downloads');}
+        catch(error){if(!controller.signal.aborted)showToast(error.message);}
+        finally{save.disabled=!mediaEnabled(target.reference);}
+      });
+      const show=position=>{
+        if(position<0||position>=items.length)return;
+        itemCleanup();pointers.clear();gesture=null;index=position;zoom=1;x=y=rotation=0;
+        const item=items[index],image=item.kind==='image';media=document.createElement(image?'img':'video');stage.replaceChildren(media);playerSlot.replaceChildren();
+        previous.disabled=index===0;next.disabled=index===items.length-1;previous.hidden=next.hidden=items.length===1;count.textContent=`${index+1} / ${items.length}`;
+        for(const button of [minus,fit,plus,rotate])button.hidden=!image;
+        save.disabled=!mediaEnabled(target.reference);
+        const mediaElement=media;
+        if(image){media.alt=`Media ${index+1}`;media.draggable=false;media.onload=draw;itemCleanup=()=>{mediaElement.onload=null;};}
+        else{media.playsInline=true;media.preload='metadata';media.controls=!state.settings.videoControls;media.loop=true;media.muted=sourceVideo?.muted??true;
+          const controls=state.settings.videoControls?makeVideoControls(media):null;if(controls)playerSlot.appendChild(controls.element);
+          itemCleanup=()=>{controls?.dispose();mediaElement.pause();mediaElement.removeAttribute('src');mediaElement.load();};
+        }
+        media.onerror=()=>{if(media===mediaElement&&!controller.signal.aborted)showToast('This media could not load. Try reopening it.');};
+        media.src=item.url;draw();
+      };
+      const pointers=new Map();let gesture=null;
+      const snapshot=()=>{const values=[...pointers.values()];if(!values.length){gesture=null;return;}const center=values.length>1?{x:(values[0].x+values[1].x)/2,y:(values[0].y+values[1].y)/2}:values[0];gesture={center,x,y,zoom,distance:values.length>1?Math.hypot(values[0].x-values[1].x,values[0].y-values[1].y):0};};
+      const opts={signal:controller.signal};
+      stage.addEventListener('pointerdown',event=>{if(items[index].kind!=='image'||event.button!==0)return;event.preventDefault();stage.focus();pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});try{stage.setPointerCapture(event.pointerId);}catch{}snapshot();},opts);
+      stage.addEventListener('pointermove',event=>{if(!pointers.has(event.pointerId)||!gesture)return;pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});const values=[...pointers.values()];
+        const center=values.length>1?{x:(values[0].x+values[1].x)/2,y:(values[0].y+values[1].y)/2}:values[0];
+        zoom=gesture.distance?clamp(gesture.zoom*Math.hypot(values[0].x-values[1].x,values[0].y-values[1].y)/gesture.distance,1,8):gesture.zoom;
+        const rect=stage.getBoundingClientRect(),px=gesture.center.x-rect.left-rect.width/2,py=gesture.center.y-rect.top-rect.height/2,ratio=zoom/gesture.zoom;
+        x=px-(px-gesture.x)*ratio+center.x-gesture.center.x;y=py-(py-gesture.y)*ratio+center.y-gesture.center.y;draw();
+      },opts);
+      for(const type of ['pointerup','pointercancel','lostpointercapture'])stage.addEventListener(type,event=>{pointers.delete(event.pointerId);snapshot();},opts);
+      stage.addEventListener('wheel',event=>{if(items[index].kind!=='image')return;event.preventDefault();const r=stage.getBoundingClientRect();zoomTo(zoom*Math.exp(-clamp(event.deltaY,-100,100)*.004),event.clientX-r.left-r.width/2,event.clientY-r.top-r.height/2);},{...opts,passive:false});
+      stage.addEventListener('dblclick',()=>zoomTo(zoom>1?1:2),opts);
+      modal.backdrop.addEventListener('keydown',event=>{if(event.target.matches('input,select'))return;const key=event.key;
+        if(key==='ArrowLeft')show(index-1);else if(key==='ArrowRight')show(index+1);else if(items[index].kind==='image'&&['+','=','-','0','r','R'].includes(key)){if(key==='-')zoomTo(zoom/1.5);else if(key==='0')fit.click();else if(key.toLowerCase()==='r')rotate.click();else zoomTo(zoom*1.5);}else return;event.preventDefault();event.stopPropagation();
+      },opts);
+      resizeObserver=new ResizeObserver(draw);resizeObserver.observe(stage);show(0);stage.focus();
+    }catch(error){if(!controller.signal.aborted)modal.body.innerHTML=`<div class="igp-note" role="alert">${escapeHTML(error.message)}</div>`;}
+  }
+
   function clearMediaButtons() {
-    for (const host of state.mediaBindings.values()) host.remove();
+    for (const host of state.mediaBindings.values()) { host.igpDispose?.(); host.remove(); }
     state.mediaBindings.clear();
   }
 
@@ -1922,14 +2144,14 @@
     if (!isStoryRoute()) for (const article of document.querySelectorAll('article')) {
       const reference = articleReference(article);
       const selected = routeReference?.key === reference?.key ? routeReference : reference;
-      if (mediaEnabled(selected) && (!routeReference || reference?.key === routeReference.key) && inMediaViewport(article)) targets.set(article,{ reference:selected, scope:article });
+      if (selected && (mediaEnabled(selected) || state.settings.mediaViewer || state.settings.videoControls) && (!routeReference || reference?.key === routeReference.key) && inMediaViewport(article)) targets.set(article,{ reference:selected, scope:article });
     }
-    if (mediaEnabled(direct?.reference) && !targets.has(direct.scope)) {
+    if (direct && (mediaEnabled(direct.reference) || state.settings.mediaViewer || state.settings.videoControls) && !targets.has(direct.scope)) {
       const scope = direct.reference.kind === 'story' ? storyControlScope() : direct.scope || [...document.querySelectorAll('[role="dialog"],main')].find(el => inMediaViewport(el) && el.querySelector('video,img,svg[aria-label]')) || document.querySelector('main');
       if (scope && !scope.closest('[data-igp-media-host]')) targets.set(scope,direct);
     }
     for (const [scope,host] of state.mediaBindings) {
-      if (!targets.has(scope) || !host.isConnected) { host.remove(); state.mediaBindings.delete(scope); }
+      if (!targets.has(scope) || !host.isConnected) { host.igpDispose?.();host.remove(); state.mediaBindings.delete(scope); }
     }
     for (const [scope,target] of targets) {
       const kind = target.reference.kind, slot = mediaActionSlot(scope,kind);
@@ -1939,22 +2161,56 @@
         host = document.createElement('span'); host.setAttribute('data-igp-media-host','');
         host.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;vertical-align:middle;pointer-events:auto;';
         const shadow = host.attachShadow({mode:'open'});
-        shadow.innerHTML = `<style>:host{color:inherit}button{display:grid;place-items:center;width:36px;height:36px;padding:6px;border:0;border-radius:50%;background:transparent;color:inherit;cursor:pointer;touch-action:manipulation}button:hover{opacity:.6}button:focus-visible{outline:2px solid #0095f6;outline-offset:2px}svg{display:block;pointer-events:none}:host([data-kind="story"]) button{width:30px;height:30px;padding:5px}:host([data-kind="story"]) svg{width:20px;height:20px}</style><button type="button">${icon('download')}</button>`;
-        shadow.querySelector('button').addEventListener('click', event => {
-          event.preventDefault(); event.stopPropagation();
+        shadow.innerHTML = `<style>${THEME_CSS}${PLAYER_CSS}:host{color:inherit;position:relative}.tools{display:flex;align-items:center}:host([data-rail="true"]) .tools{flex-direction:column}.tools>button{display:grid;place-items:center;width:32px;height:36px;padding:5px;border:0;border-radius:50%;background:transparent;color:inherit;cursor:pointer;touch-action:manipulation}.tools>button:hover{opacity:.6}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #0095f6;outline-offset:2px}svg{display:block;pointer-events:none}:host([data-kind="story"]) .tools>button{width:28px;height:30px;padding:5px}:host([data-kind="story"]) svg{width:19px;height:19px}.popover{position:absolute;z-index:10;right:0;bottom:calc(100% + 8px);box-shadow:var(--shadow);border-radius:10px}:host([data-kind="story"]) .popover{bottom:auto;top:calc(100% + 8px)}[hidden]{display:none!important}</style><span class="tools"><button type="button" data-tool="download">${icon('download')}</button><button type="button" data-tool="stories" title="Download all stories" aria-label="Download all stories">${icon('downloadAll')}</button><button type="button" data-tool="viewer" title="Open media viewer" aria-label="Open media viewer">${icon('expand')}</button><button type="button" data-tool="video" title="Video controls" aria-label="Video controls" aria-expanded="false">${icon('controls')}</button></span><div class="popover" hidden></div>`;
+        const freshTarget=()=>{
           const article = scope.matches('article') ? articleReference(scope) : null, route = parseMediaReference(location.href);
-          const fresh = scope.matches('article') ? {reference:route?.key === article?.key ? route : article,scope} : currentMediaTarget();
-          if (fresh && mediaEnabled(fresh.reference)) void openMediaDownload(fresh);
+          return scope.matches('article') ? {reference:route?.key === article?.key ? route : article,scope} : currentMediaTarget();
+        };
+        let videoUI=null;const popover=shadow.querySelector('.popover'),videoButton=shadow.querySelector('[data-tool="video"]');
+        const closeVideo=()=>{videoUI?.dispose();videoUI=null;if(typeof popover.hidePopover==='function'&&popover.matches(':popover-open'))popover.hidePopover();popover.replaceChildren();popover.hidden=true;videoButton.setAttribute('aria-expanded','false');};
+        const outside=event=>{if(videoUI&&!event.composedPath().includes(host))closeVideo();};
+        document.addEventListener('pointerdown',outside,true);
+        const reposition=()=>{if(videoUI)closeVideo();};
+        document.addEventListener('scroll',reposition,true);window.addEventListener('resize',reposition);
+        host.igpDispose=()=>{closeVideo();document.removeEventListener('pointerdown',outside,true);document.removeEventListener('scroll',reposition,true);window.removeEventListener('resize',reposition);};
+        host.igpCloseVideo=closeVideo;
+        shadow.addEventListener('click', event => {
+          event.stopPropagation();
+          const tool=event.target.closest('[data-tool]')?.dataset.tool;if(!tool)return;
+          event.preventDefault();
+          const fresh=freshTarget();if(!fresh?.reference)return;
+          if(tool==='download')void openMediaDownload(fresh);
+          if(tool==='stories')void openMediaDownload(fresh,{allStories:true});
+          if(tool==='viewer')void openMediaViewer(fresh);
+          if(tool==='video'){
+            if(videoUI){closeVideo();return;}
+            const video=targetVideo(fresh);if(!video){showToast('Open the video first.');return;}
+            videoUI=makeVideoControls(video);popover.replaceChildren(videoUI.element);popover.hidden=false;videoButton.setAttribute('aria-expanded','true');
+            if(typeof popover.showPopover==='function'){
+              popover.setAttribute('popover','manual');popover.style.cssText='position:fixed;inset:auto;margin:0;padding:0;border:0;background:transparent;overflow:visible;color:var(--fg)';popover.showPopover();
+              const anchor=videoButton.getBoundingClientRect(),r=popover.getBoundingClientRect(),vp=viewport();
+              popover.style.left=`${clamp(anchor.right-r.width,vp.left+8,Math.max(vp.left+8,vp.left+vp.width-r.width-8))}px`;
+              popover.style.top=`${clamp(kind==='story'?anchor.bottom+8:anchor.top-r.height-8,vp.top+8,Math.max(vp.top+8,vp.top+vp.height-r.height-8))}px`;
+            }
+          }
         });
+        shadow.addEventListener('keydown',event=>{if(event.key==='Escape'&&!popover.hidden){event.preventDefault();closeVideo();videoButton.focus();}});
         // Keep Instagram's delegated media/player handlers away from our control.
         for (const type of ['pointerdown','pointerup','dblclick','keydown','keyup']) host.addEventListener(type,event=>event.stopPropagation());
         state.mediaBindings.set(scope,host);
       }
       if (host.dataset.kind !== kind) host.dataset.kind = kind;
+      const rail=String(getComputedStyle(slot.parent).flexDirection==='column');if(host.dataset.rail!==rail)host.dataset.rail=rail;
+      const theme=state.rootHost?.dataset.theme||'light';if(host.dataset.theme!==theme)host.dataset.theme=theme;
       const placement = slot.native ? 'native' : 'inline';
       if (host.dataset.placement !== placement) host.dataset.placement = placement;
       const button = host.shadowRoot.querySelector('button'), label = `Download ${kind}`;
       if (button.getAttribute('aria-label') !== label) { button.setAttribute('aria-label',label); button.title = label; }
+      const visibleVideo=targetVideo(target);
+      if(host.igpVideo!==visibleVideo){host.igpCloseVideo?.();host.igpVideo=visibleVideo;}
+      if(visibleVideo&&state.settings.videoControls)applyPlaybackPreferences(visibleVideo);
+      const visibility={download:mediaEnabled(target.reference),stories:kind==='story'&&state.settings.storyDownloads,viewer:state.settings.mediaViewer,video:state.settings.videoControls&&!!visibleVideo};
+      for(const [tool,visible] of Object.entries(visibility)){const element=host.shadowRoot.querySelector(`[data-tool="${tool}"]`);if(element.hidden===!!visible)element.hidden=!visible;}
       if (host.style.color !== slot.color) host.style.color = slot.color;
       // Avoid repeated mutations when our host is already immediately after the anchor.
       if (host.parentElement !== slot.parent || (slot.before !== host && host.nextSibling !== slot.before)) slot.parent.insertBefore(host,slot.before);
@@ -1978,6 +2234,7 @@
     if (previous === next) return;
     state.lastURL = next;
     clearMediaButtons();
+    if (!previous.includes('/stories/') || !next.includes('/stories/')) removeModal('igp-viewer-modal');
 
     const oldStory = previous.includes('/stories/');
     const newStory = next.includes('/stories/');
@@ -2038,6 +2295,8 @@
       state.relationshipController?.abort();
       state.compareController?.abort();
       state.mediaController?.abort();
+      removeModal('igp-viewer-modal');
+      clearMediaButtons();
     });
     addEventListener('storage', event => {
       if (event.key === SETTINGS_KEY) {
