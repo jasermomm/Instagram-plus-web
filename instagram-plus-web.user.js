@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Instagram Plus (Web)
 // @namespace    https://greasyfork.org/
-// @version      1.9.0
-// @description  Instagram Web enhancements: media zoom, video controls, quick downloads, save all stories, follow/unfollow alerts, bio fonts, viewer search and follower comparison.
+// @version      2.4.0
+// @description  Instagram media downloads, viewer, video controls, native follower comparison, Friend Activity, Story tools and bio fonts.
 // @author       Jasermomm
 // @match        https://www.instagram.com/*
 // @icon         https://www.instagram.com/static/images/ico/favicon-200.png/ab6eff595bb1.png
@@ -20,6 +20,7 @@
 
 /* global exportFunction: readonly */
 
+// Established media, Story and bio engine.
 (() => {
   'use strict';
 
@@ -213,20 +214,14 @@
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ICONS.plus}</svg>`;
   }
   const THEME_CSS = `
-    :host{--bg:#fff;--fg:#262626;--muted:#737373;--bd:#dbdbdb;--soft:#f5f5f5;--soft2:#efefef;--strong:#262626;--inverse:#fff;--accent:#0095f6;--shadow:0 8px 32px #0002;color-scheme:light;font:14px/1.4 ${UI_FONT}}
-    :host([data-theme="dark"]){--bg:#262626;--fg:#f5f5f5;--muted:#a8a8a8;--bd:#363636;--soft:#303030;--soft2:#3a3a3a;--strong:#f5f5f5;--inverse:#121212;--shadow:0 8px 32px #0005;color-scheme:dark}
+    :host{--bg:#fff;--fg:#161616;--muted:#666;--bd:#e6e6e6;--soft:#f5f5f5;--soft2:#efefef;--strong:#262626;--inverse:#fff;--accent:#006fc4;--shadow:0 8px 32px #0002;color-scheme:light;font:14px/1.4 ${UI_FONT}}
+    :host([data-theme="dark"]){--bg:#161616;--fg:#fafafa;--muted:#adadad;--bd:#353535;--soft:#232323;--soft2:#303030;--accent:#53b5ff;--strong:#f5f5f5;--inverse:#121212;--shadow:0 8px 32px #0005;color-scheme:dark}
   `;
   const GLOBAL_CSS = `${THEME_CSS}
     :host{all:initial;font:14px/1.4 ${UI_FONT};color:var(--fg)}
     *{box-sizing:border-box;font-family:${UI_FONT}}button,input,select{font:inherit}button{color:inherit;cursor:pointer}button:disabled{opacity:.45;cursor:default}
     button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
     svg{display:block;flex:none}button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
-    #igp-launcher{position:fixed;width:46px;height:46px;display:grid;place-items:center;border:1px solid var(--bd);border-radius:50%;background:var(--bg);color:var(--fg);box-shadow:0 3px 14px #0002;pointer-events:auto;cursor:grab;touch-action:none;user-select:none;z-index:2147483646;transition:box-shadow .18s,background .18s}
-    #igp-launcher:hover{background:var(--soft);box-shadow:0 4px 18px #0003}
-    #igp-launcher svg{transition:transform .2s}#igp-launcher[aria-expanded="true"] svg{transform:rotate(45deg)}
-    #igp-launcher.dragging{cursor:grabbing;box-shadow:0 9px 24px #0003}
-    #igp-panel{position:fixed;width:min(292px,calc(100vw - 28px));max-height:calc(100dvh - 28px);overflow:auto;overscroll-behavior:contain;border:1px solid var(--bd);border-radius:16px;background:var(--bg);color:var(--fg);box-shadow:var(--shadow);z-index:2147483646;visibility:hidden;opacity:0;pointer-events:none;transform:translateY(-4px);transition:opacity .14s,transform .14s,visibility .14s}
-    #igp-panel.open{visibility:visible;opacity:1;pointer-events:auto;transform:none}
     .head{display:flex;align-items:center;justify-content:space-between;padding:17px 18px 12px}.title{font-size:15px;font-weight:650}.version{font-size:11px;color:var(--muted)}
     .quick-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 12px 14px}
     .menu-action{display:flex;gap:9px;align-items:center;justify-content:center;border:0;border-radius:10px;padding:12px 8px;background:var(--soft);font-size:13px;font-weight:600}.menu-action:hover{background:var(--soft2)}
@@ -234,16 +229,16 @@
     .download-toggles{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.chip{position:relative;cursor:pointer}.chip input{position:absolute;opacity:0;width:1px;height:1px}.chip span{display:flex;flex-direction:column;align-items:center;gap:7px;padding:10px 4px;border:1px solid var(--bd);border-radius:10px;color:var(--muted);font-size:12px}.chip input:checked+span{background:var(--soft);color:var(--fg);border-color:var(--fg)}.chip input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
     .list{padding:6px 16px 10px}.setting{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;cursor:pointer}.setting strong{font-size:13px;font-weight:400}.setting small{color:var(--muted);font-size:11px}
     .switch{position:relative;width:32px;height:20px;flex:none}.switch input{position:absolute;opacity:0;width:1px;height:1px}.slider{position:absolute;inset:0;border-radius:20px;background:var(--bd);transition:background .16s}.slider:before{content:"";position:absolute;width:16px;height:16px;left:2px;top:2px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #0002;transition:transform .16s}.switch input:checked+.slider{background:var(--strong)}.switch input:checked+.slider:before{transform:translateX(12px);background:var(--inverse)}.switch input:focus-visible+.slider{outline:2px solid var(--accent);outline-offset:3px}
-    .igp-icon-btn{width:34px;height:34px;display:inline-grid;place-items:center;border:0;border-radius:50%;background:transparent;color:var(--fg);flex:none}.igp-icon-btn:hover{background:var(--soft2)}.igp-icon-btn[aria-pressed="true"]{color:var(--accent)}
+    .igp-icon-btn{width:44px;height:44px;display:inline-grid;place-items:center;border:0;border-radius:50%;background:transparent;color:var(--fg);flex:none}.igp-icon-btn:hover{background:var(--soft2)}.igp-icon-btn[aria-pressed="true"]{color:var(--accent)}
     .igp-modal-backdrop{position:fixed;inset:0;margin:0;width:100%;height:100%;max-width:none;max-height:none;border:0;z-index:2147483647;display:grid;place-items:center;padding:20px;pointer-events:auto;background:#0009;animation:igpFade .14s ease}
     .igp-modal-backdrop::backdrop{background:transparent}
-    .igp-modal{width:min(420px,100%);max-height:calc(100dvh - 40px);display:flex;flex-direction:column;overflow:hidden;border-radius:12px;background:var(--bg);color:var(--fg);box-shadow:var(--shadow);animation:igpPop .18s ease}
-    .igp-modal-head{flex:none;display:grid;grid-template-columns:34px 1fr 34px;align-items:center;min-height:48px;padding:5px 9px;border-bottom:1px solid var(--bd)}.igp-modal-title{text-align:center;font-size:16px;font-weight:600}.igp-modal-body{min-height:0;overflow:auto;overscroll-behavior:contain}
-    .igp-note{padding:14px 16px;color:var(--muted);font-size:12px;line-height:1.5}.igp-note:empty{display:none}.igp-actions{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 16px}.igp-actions button{border:0;border-radius:8px;padding:9px 12px;background:var(--soft);font-size:13px}.igp-actions button:hover{background:var(--soft2)}
-    .igp-downloads{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.igp-downloads button{display:flex;align-items:center;justify-content:center;gap:9px;flex-wrap:wrap;min-height:46px}.igp-downloads button:only-child,.igp-downloads .igp-save-all{grid-column:1/-1}.igp-downloads .igp-save-all{background:var(--accent);color:white;font-weight:600}.igp-downloads img{display:block;width:100%;height:160px;object-fit:cover;border-radius:5px}.igp-downloads button[data-saved]{color:var(--muted)}
+    .igp-modal{width:min(420px,100%);max-height:calc(100dvh - 40px);display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--bd);border-radius:20px;background:var(--bg);color:var(--fg);box-shadow:var(--shadow);animation:igpPop .18s ease}
+    .igp-modal-head{flex:none;display:grid;grid-template-columns:44px 1fr 44px;align-items:center;min-height:64px;padding:8px 12px;border-bottom:1px solid var(--bd)}.igp-modal-title{text-align:center;font-size:16px;font-weight:600}.igp-modal-body{min-height:0;overflow:auto;overscroll-behavior:contain}
+    .igp-note{padding:14px 16px;color:var(--muted);font-size:12px;line-height:1.5}.igp-note:empty{display:none}.igp-actions{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 16px}.igp-actions button{min-height:44px;border:0;border-radius:12px;padding:12px 14px;background:var(--soft);font-size:13px}.igp-actions button:hover{background:var(--soft2)}
+    .igp-downloads{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.igp-downloads button{display:flex;align-items:center;justify-content:center;gap:9px;flex-wrap:wrap;min-height:46px}.igp-downloads button:only-child,.igp-downloads .igp-save-all{grid-column:1/-1}.igp-downloads .igp-save-all{background:var(--strong);color:var(--inverse);font-weight:600}.igp-downloads img{display:block;width:100%;height:160px;object-fit:cover;border-radius:5px}.igp-downloads button[data-saved]{color:var(--muted)}
     .igp-history-tools{display:flex;align-items:center;gap:3px;padding:6px 12px}.igp-history-tools time{flex:1;color:var(--muted);font-size:11px}.igp-help{margin:0 16px 14px;color:var(--muted);font-size:12px}.igp-help summary{cursor:pointer}.igp-help p{line-height:1.5}
     .igp-event{display:block;padding:13px 16px;border-top:1px solid var(--bd);color:var(--fg);text-decoration:none;font-size:13px}.igp-event time{display:block;margin-top:4px;color:var(--muted);font-size:11px}
-    .igp-search-wrap{flex:none;padding:12px 16px}.igp-search{width:100%;height:36px;border:0;border-radius:8px;background:var(--soft2);color:var(--fg);padding:0 12px;font-size:14px}.igp-search::placeholder{color:var(--muted)}
+    .igp-search-wrap{flex:none;padding:12px 16px}.igp-search{width:100%;height:44px;border:0;border-radius:12px;background:var(--soft2);color:var(--fg);padding:0 12px;font-size:14px}.igp-search::placeholder{color:var(--muted)}
     .igp-tabs{flex:none;display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--bd)}.igp-tab{border:0;border-bottom:1px solid transparent;background:none;color:var(--muted);padding:13px 4px;font-size:12px;font-weight:600}.igp-tab.active{border-bottom-color:var(--fg);color:var(--fg)}
     .igp-results{min-height:120px;overflow:auto;overscroll-behavior:contain;padding:4px 0}.igp-person{display:grid;grid-template-columns:44px minmax(0,1fr) 24px;gap:12px;align-items:center;padding:8px 16px;color:var(--fg);text-decoration:none}.igp-person:hover{background:var(--soft)}.igp-avatar{width:44px;height:44px;border-radius:50%;object-fit:cover;background:var(--soft2)}.igp-person-text{min-width:0}.igp-username,.igp-name{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}.igp-username{font-weight:600}.igp-name{color:var(--muted)}.igp-heart{text-align:center;color:#ff3040}
     .igp-empty,.igp-progress{padding:32px 18px;text-align:center;color:var(--muted);font-size:13px}.igp-progress strong{display:block;color:var(--fg);font-size:15px}.igp-progress span{display:block;margin-top:7px}.igp-spinner{width:24px;height:24px;margin:0 auto 14px;border:2px solid var(--bd);border-top-color:var(--fg);border-radius:50%;animation:igpSpin .7s linear infinite}
@@ -272,142 +267,17 @@
     host.id = `${APP}-root`;
     host.style.cssText = 'all:initial;position:fixed;inset:0;pointer-events:none;z-index:2147483645;';
     const root = host.attachShadow({ mode: 'open' });
-    root.innerHTML = `<style>${GLOBAL_CSS}</style><button id="igp-launcher" type="button" aria-label="Instagram Plus settings" aria-controls="igp-panel" aria-expanded="false" title="Instagram Plus · drag to move">${icon('plus',28)}</button><div id="igp-panel" role="region" aria-label="Instagram Plus settings" inert></div>`;
+    // The published 1.9 engine remains responsible for proven features. The
+    // v2.2 shell owns the launcher and settings interface.
+    root.innerHTML = `<style>${GLOBAL_CSS}</style><div id="igp-toasts" aria-live="polite"></div>`;
     document.documentElement.appendChild(host);
     state.rootHost = host; state.root = root;
     for (const type of ['click','pointerdown','pointerup','dblclick']) root.addEventListener(type,event=>event.stopPropagation());
-    const launcher = root.getElementById('igp-launcher');
-    installLauncherDrag(launcher);
-    launcher.addEventListener('click', event => {
-      if (Date.now() < state.suppressLauncherClickUntil) { event.preventDefault(); return; }
-      state.panelOpen = !state.panelOpen; renderPanel();
-      if (state.panelOpen && event.detail === 0) root.querySelector('#igp-panel button')?.focus();
-    });
-    applyLauncherPosition(); renderPanel(); syncTheme();
-  }
-
-  function launcherBounds(launcher) {
-    const vp = viewport(), margin = 14;
-    return { minX: vp.left + margin, maxX: Math.max(vp.left + margin, vp.left + vp.width - (launcher.offsetWidth || 46) - margin),
-      minY: vp.top + margin, maxY: Math.max(vp.top + margin, vp.top + vp.height - (launcher.offsetHeight || 46) - margin) };
-  }
-
-  function applyLauncherPosition() {
-    const launcher = state.root?.getElementById('igp-launcher');
-    if (!launcher) return;
-    state.cancelLauncherMotion?.();
-    const b = launcherBounds(launcher);
-    const x = clamp(Number.isFinite(state.launcherPosition?.x) ? state.launcherPosition.x : b.maxX, b.minX, b.maxX);
-    const y = clamp(Number.isFinite(state.launcherPosition?.y) ? state.launcherPosition.y : b.minY, b.minY, b.maxY);
-    launcher.style.left = `${x}px`; launcher.style.top = `${y}px`;
-    state.launcherPosition = { x, y }; saveLauncherPosition();
-  }
-
-  function installLauncherDrag(launcher) {
-    let drag = null, frame = 0;
-    const point = () => ({ x: parseFloat(launcher.style.left) || 0, y: parseFloat(launcher.style.top) || 0 });
-    const move = (x, y) => {
-      const b = launcherBounds(launcher);
-      x = clamp(x,b.minX,b.maxX); y = clamp(y,b.minY,b.maxY);
-      launcher.style.left = `${x}px`; launcher.style.top = `${y}px`;
-      state.launcherPosition = { x, y };
-      if (state.panelOpen) positionPanel();
-    };
-    const stop = () => { cancelAnimationFrame(frame); frame = 0; };
-    state.cancelLauncherMotion = () => {
-      stop();
-      if (drag?.moved) state.suppressLauncherClickUntil = Date.now() + 400;
-      const id = drag?.id; drag = null; launcher.classList.remove('dragging');
-      if (id !== undefined && launcher.hasPointerCapture?.(id)) launcher.releasePointerCapture(id);
-    };
-    launcher.addEventListener('pointerdown', event => {
-      if (event.button !== 0 || drag || event.isPrimary === false) return;
-      stop();
-      drag = { id:event.pointerId, startX:event.clientX, startY:event.clientY, ...point(), lastX:event.clientX, lastY:event.clientY, at:performance.now(), vx:0, vy:0, moved:false };
-      try { launcher.setPointerCapture?.(event.pointerId); } catch {}
-    });
-    launcher.addEventListener('pointermove', event => {
-      if (!drag || event.pointerId !== drag.id) return;
-      const dx = event.clientX-drag.startX, dy = event.clientY-drag.startY;
-      if (!drag.moved && Math.hypot(dx,dy) <= 5) return;
-      drag.moved = true; launcher.classList.add('dragging'); event.preventDefault();
-      const now = performance.now(), dt = Math.max(8,now-drag.at);
-      drag.vx = clamp((event.clientX-drag.lastX)/dt,-1.5,1.5);
-      drag.vy = clamp((event.clientY-drag.lastY)/dt,-1.5,1.5);
-      drag.lastX = event.clientX; drag.lastY = event.clientY; drag.at = now;
-      move(drag.x+dx,drag.y+dy);
-    });
-    const finish = event => {
-      if (!drag || event.pointerId !== drag.id) return;
-      const ended = drag; drag = null;
-      launcher.classList.remove('dragging');
-      if (launcher.hasPointerCapture?.(event.pointerId)) launcher.releasePointerCapture(event.pointerId);
-      if (!ended.moved) return;
-      state.suppressLauncherClickUntil = Date.now()+400;
-      if (event.type !== 'pointerup') { saveLauncherPosition(); return; }
-      const p = point(), b = launcherBounds(launcher);
-      const fresh = performance.now()-ended.at < 90;
-      const projectedX = clamp(p.x+(fresh ? ended.vx*120 : 0),b.minX,b.maxX);
-      const x = projectedX < (b.minX+b.maxX)/2 ? b.minX : b.maxX;
-      const y = clamp(p.y+(fresh ? ended.vy*100 : 0),b.minY,b.maxY);
-      if (matchMedia('(prefers-reduced-motion: reduce)').matches) { move(x,y); saveLauncherPosition(); return; }
-      // Project the release velocity, then settle without oscillation or offscreen bounce.
-      const start = performance.now();
-      const settle = now => {
-        const t = Math.min(1,(now-start)/360), ease = 1-Math.pow(1-t,3);
-        move(p.x+(x-p.x)*ease,p.y+(y-p.y)*ease);
-        if (t < 1) frame = requestAnimationFrame(settle);
-        else { frame = 0; saveLauncherPosition(); }
-      };
-      frame = requestAnimationFrame(settle);
-    };
-    for (const type of ['pointerup','pointercancel','lostpointercapture']) launcher.addEventListener(type,finish);
-    launcher.addEventListener('keydown', event => {
-      if (!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home'].includes(event.key)) return;
-      event.preventDefault(); event.stopPropagation(); state.cancelLauncherMotion();
-      const p = point(), b = launcherBounds(launcher), step = event.shiftKey ? 40 : 10;
-      move(event.key === 'Home' ? b.maxX : p.x+(event.key === 'ArrowRight' ? step : event.key === 'ArrowLeft' ? -step : 0),
-        event.key === 'Home' ? b.minY : p.y+(event.key === 'ArrowDown' ? step : event.key === 'ArrowUp' ? -step : 0));
-      saveLauncherPosition();
-    });
-  }
-
-  function positionPanel() {
-    const panel = state.root?.getElementById('igp-panel'), launcher = state.root?.getElementById('igp-launcher');
-    if (!panel || !launcher) return;
-    const vp = viewport(), b = launcher.getBoundingClientRect(), w = panel.offsetWidth || 292, h = panel.offsetHeight || 400, margin = 14;
-    const left = clamp(b.right-w,vp.left+margin,Math.max(vp.left+margin,vp.left+vp.width-w-margin));
-    const below = b.bottom+10;
-    const top = below+h <= vp.top+vp.height-margin ? below : clamp(b.top-h-10,vp.top+margin,Math.max(vp.top+margin,vp.top+vp.height-h-margin));
-    panel.style.left = `${left}px`; panel.style.top = `${top}px`;
+    syncTheme();
   }
 
   function renderPanel() {
-    if (!state.root) return;
-    const panel = state.root.getElementById('igp-panel');
-    const hadFocus = panel.contains(state.root.activeElement);
-    panel.classList.toggle('open',state.panelOpen); panel.inert = !state.panelOpen;
-    state.root.getElementById('igp-launcher').setAttribute('aria-expanded',String(state.panelOpen));
-    const rows = [['mediaViewer','Media viewer'],['videoControls','Video controls'],['bioFonts','Bio fonts'],['viewerSearch','Viewer search'],['relationshipNotifier','Activity alerts'],['storyPreview','Story preview']];
-    panel.innerHTML = `<div class="head"><span class="title">Instagram Plus</span><span class="version">${VERSION}</span></div>
-      <div class="quick-actions"><button id="igp-activity" class="menu-action" type="button">${icon('activity',19)} Activity</button><button id="igp-compare-followers" class="menu-action" type="button" ${state.followerCompareRunning ? 'disabled' : ''}>${icon('compare',19)} ${state.followerCompareRunning ? 'Loading…' : 'Compare'}</button></div>
-      <div class="download-settings"><div class="section-label">Downloads<button id="igp-download-current" class="igp-icon-btn" aria-label="Download current media" title="Download current media" type="button">${icon('download',18)}</button></div><div class="download-toggles">
-      ${[['storyDownloads','Stories','story'],['postDownloads','Posts','post'],['reelDownloads','Reels','reel']].map(([key,label,glyph])=>`<label class="chip"><input type="checkbox" data-key="${key}" aria-label="${label} downloads" ${state.settings[key] ? 'checked' : ''}><span>${icon(glyph,21)}${label}</span></label>`).join('')}</div></div>
-      <div class="list">${rows.map(([key,label])=>`<label class="setting"><strong>${label}</strong><span class="switch"><input type="checkbox" data-key="${key}" ${state.settings[key] ? 'checked' : ''}><span class="slider"></span></span></label>`).join('')}</div>`;
-    panel.querySelectorAll('input[data-key]').forEach(input => input.addEventListener('change', () => {
-      state.settings[input.dataset.key] = input.checked; saveSettings(); cleanupDisabledFeatures();
-      if (input.dataset.key === 'relationshipNotifier') { state.relationshipController?.abort(); state.relationshipNextCheck = 0; relationshipTick(); }
-      scheduleScan(0);
-    }));
-    panel.querySelector('#igp-compare-followers').addEventListener('click',runFollowerCompare);
-    panel.querySelector('#igp-activity').addEventListener('click',openRelationshipHistory);
-    panel.querySelector('#igp-download-current').addEventListener('click', () => {
-      const target = currentMediaTarget();
-      if (target && mediaEnabled(target.reference)) void openMediaDownload(target);
-      else showToast('Open a story, post or reel with downloads enabled.');
-    });
-    if (!state.panelOpen && hadFocus) state.root.getElementById('igp-launcher').focus({preventScroll:true});
-    if (state.panelOpen) requestAnimationFrame(positionPanel);
+    // Kept as a compatibility hook for the unchanged 1.9 feature callbacks.
   }
 
 
@@ -1010,74 +880,11 @@
   // ---------------------------------------------------------------------------
   // Follower comparison uses complete lists without navigating or scrolling.
   // ---------------------------------------------------------------------------
-  async function runFollowerCompare() {
-    if (state.followerCompareRunning) {
-      const active = state.root?.getElementById('igp-follow-compare-modal');
-      if (active?.isConnected) { if (!active.open) active.showModal?.(); active.querySelector('button')?.focus(); return; }
-      state.compareController?.abort();
-    }
-    const accountId = loggedInAccountID();
-    state.panelOpen = false;
-    state.followerCompareRunning = true;
-    const controller = new AbortController();
-    state.compareController = controller;
-    let modal;
-    const progress = (label,count,total) => {
-      const status = modal?.body.querySelector('[data-compare-progress]');
-      if (status && !controller.signal.aborted) status.textContent = `${label} ${count}/${total}`;
-    };
-    const collect = async () => {
-      const counts = await fetchRelationshipCounts(accountId, controller.signal);
-      const followers = await fetchRelationshipList(accountId, 'followers', counts.followers, controller.signal,(count,total)=>progress('Followers',count,total));
-      const following = await fetchRelationshipList(accountId, 'following', counts.following, controller.signal,(count,total)=>progress('Following',count,total));
-      const after = await fetchRelationshipCounts(accountId, controller.signal);
-      if (counts.followers !== after.followers || counts.following !== after.following) throw new Error('Your lists changed while loading. Try again.');
-      return { followers, following };
-    };
-    try {
-      renderPanel();
-      modal = createModalShell('igp-follow-compare-modal', 'Compare', { onClose: () => controller.abort() });
-      modal.body.innerHTML = '<div class="igp-progress" role="status"><div class="igp-spinner"></div><span data-compare-progress>Loading followers…</span></div>';
-      if (!accountId) throw new Error('Sign in to Instagram, then try Compare again.');
-      const record = readRelationships(accountId);
-      if (record?.retryAfter > Date.now()) throw new Error('Instagram checks are paused after a failed request. Try again after the retry time shown in Friend Activity.');
-      const result = navigator.locks?.request
-        ? await navigator.locks.request(`${APP}:relationship-check:${accountId}`, { ifAvailable: true }, lock => {
-          if (!lock) throw new Error('Another tab is checking followers. Try again when it finishes.');
-          return collect();
-        }) : await collect();
-      if (controller.signal.aborted || accountId !== loggedInAccountID() || !modal.backdrop.isConnected) return;
-      const groups = [
-        { label: "Don't follow you", people: Object.values(result.following).filter(person => !Object.hasOwn(result.followers, person.id)) },
-        { label: "You don't follow", people: Object.values(result.followers).filter(person => !Object.hasOwn(result.following, person.id)) },
-      ];
-      groups.forEach(group => group.people.sort((a,b) => a.username.localeCompare(b.username)));
-      modal.body.innerHTML = `<div class="igp-tabs">${groups.map((group,i) => `<button type="button" class="igp-tab ${i ? '' : 'active'}" data-tab="${i}">${escapeHTML(group.label)} · ${group.people.length}</button>`).join('')}</div><div class="igp-search-wrap"><input class="igp-search" type="search" placeholder="Search accounts" aria-label="Search accounts"></div><div class="igp-results"></div>`;
-      let active = 0;
-      const input = modal.body.querySelector('input');
-      const render = () => renderPeopleList(modal.body.querySelector('.igp-results'), groups[active].people.filter(person => person.username.toLocaleLowerCase().includes(input.value.trim().toLocaleLowerCase())));
-      bindIGPInput(input, render);
-      modal.body.querySelectorAll('[data-tab]').forEach(button => button.addEventListener('click', () => {
-        active = Number(button.dataset.tab);
-        modal.body.querySelectorAll('[data-tab]').forEach(item => item.classList.toggle('active', item === button));
-        input.value = ''; render();
-      }));
-      render();
-    } catch (error) {
-      if (!controller.signal.aborted) {
-        const message = error.message || 'Could not load complete lists. Try again.';
-        if (modal?.backdrop.isConnected) modal.body.innerHTML = `<div class="igp-note" role="alert">${escapeHTML(message)}</div>`;
-        else showToast(message);
-      }
-    } finally {
-      if (state.compareController === controller) { state.compareController = null; state.followerCompareRunning = false; }
-      renderPanel();
-    }
-  }
+  function runFollowerCompare() { PAGE.__IGP_NATIVE_SOCIAL__?.openComparison?.(); }
 
   // Relationship snapshots and notifications.
 
-  const RELATIONSHIP_INTERVAL = 15 * 60 * 1000;
+  const RELATIONSHIP_INTERVAL = 6 * 60 * 60 * 1000;
   const RELATIONSHIP_HISTORY_LIMIT = 200;
 
   function cookieValue(name) {
@@ -1182,7 +989,7 @@
       });
       if (loggedInAccountID() !== accountId) throw new DOMException('Account changed', 'AbortError');
       if (!response.ok) {
-        const error = new Error(response.status === 429 ? 'Instagram asked us to slow down. Checks are paused for one hour.' : `Instagram could not complete the check (HTTP ${response.status}).`);
+        const error = new Error(response.status === 429 ? 'Instagram asked us to slow down. Optional checks are paused for six hours.' : `Instagram could not complete the check (HTTP ${response.status}).`);
         error.rateLimited = response.status === 429;
         throw error;
       }
@@ -1195,143 +1002,15 @@
     }
   }
 
-  async function fetchRelationshipCounts(accountId, signal) {
-    const data = await instagramJSON(`/api/v1/users/${accountId}/info/`, accountId, signal);
-    const user = data.user;
-    if (!user || String(user.pk ?? user.pk_id ?? user.id) !== accountId ||
-      !Number.isSafeInteger(user.follower_count) || user.follower_count < 0 ||
-      !Number.isSafeInteger(user.following_count) || user.following_count < 0) {
-      throw new Error('Instagram did not provide exact account totals. Your saved baseline was kept.');
-    }
-    return { followers: user.follower_count, following: user.following_count };
-  }
-
-  async function fetchRelationshipList(accountId, kind, expected, signal, onProgress = null) {
-    const people = Object.create(null);
-    const cursors = new Set();
-    let cursor = '';
-    let count = 0;
-    for (let page = 0; page < 100; page++) {
-      const query = new URLSearchParams({ count: '200' });
-      if (cursor) query.set('max_id', cursor);
-      const data = await instagramJSON(`/api/v1/friendships/${accountId}/${kind}/?${query}`, accountId, signal);
-      if (!Array.isArray(data.users)) {
-        throw new Error(`Instagram returned an incomplete ${kind} list. Your saved baseline was kept.`);
-      }
-      for (const user of data.users) {
-        const id = String(user.pk ?? user.pk_id ?? user.id ?? '');
-        if (!/^\d+$/.test(id) || !/^[\w.]{1,30}$/.test(user.username || '')) throw new Error(`Instagram returned an unreadable ${kind} entry.`);
-        if (!Object.hasOwn(people,id)) count++;
-        people[id] = { id, username: user.username };
-      }
-      state.relationshipStatus = `Checking ${kind}: ${count} of ${expected}…`;
-      onProgress?.(count,expected);
-      updateRelationshipHistory();
-      if (count > expected) throw new Error('Your relationships changed during the check. We will retry later.');
-      const next = data.next_max_id == null ? '' : String(data.next_max_id);
-      if (!next) {
-        if (data.more_available === true || count !== expected) throw new Error(`Only ${count} of ${expected} ${kind} were returned. Your saved baseline was kept.`);
-        return people;
-      }
-      if (!data.users.length || cursors.has(next)) throw new Error(`Instagram repeated a ${kind} page. Your saved baseline was kept.`);
-      cursors.add(next);
-      cursor = next;
-      await sleep(750);
-      if (signal.aborted) throw new DOMException('Cancelled', 'AbortError');
-    }
-    throw new Error('This account is too large to check in one pass. No relationship changes were recorded.');
-  }
-
-  async function checkRelationships(force = false) {
-    const accountId = loggedInAccountID();
-    if (!state.settings.relationshipNotifier || !accountId || state.relationshipRunning) return;
-    state.relationshipRunning = true;
-    const controller = new AbortController();
-    state.relationshipController = controller;
-    const run = async () => {
-      const previous = readRelationships(accountId);
-      const now = Date.now();
-      // Persist the schedule so refreshing or opening another tab cannot hammer Instagram.
-      const due = previous?.nextCheckAt || 0;
-      if (due > now && (!force || previous?.retryAfter > now || now - (previous?.lastAttemptAt || 0) < 60000)) {
-        state.relationshipNextCheck = due;
-        state.relationshipStatus = `Next check after ${new Date(due).toLocaleTimeString()}.`;
-        return;
-      }
-      const attempt = { ...(previous || {}), schema: 1, accountId, lastAttemptAt: now, nextCheckAt: now + RELATIONSHIP_INTERVAL };
-      writeRelationships(accountId, attempt);
-      state.relationshipNextCheck = attempt.nextCheckAt;
-      state.relationshipStatus = previous?.initializedAt ? 'Checking relationships…' : 'Creating your first baseline…';
-      updateRelationshipHistory();
-      try {
-        const counts = await fetchRelationshipCounts(accountId, controller.signal);
-        const followers = await fetchRelationshipList(accountId, 'followers', counts.followers, controller.signal);
-        const following = await fetchRelationshipList(accountId, 'following', counts.following, controller.signal);
-        const after = await fetchRelationshipCounts(accountId, controller.signal);
-        if (counts.followers !== after.followers || counts.following !== after.following) throw new Error('Your relationships changed during the check. Your saved baseline was kept.');
-        if (controller.signal.aborted || loggedInAccountID() !== accountId || !state.settings.relationshipNotifier) return;
-        const at = Date.now();
-        const snapshot = { followers, following };
-        const diff = relationshipDiff(previous, snapshot, at);
-        // Read history again: another tab may have cleared it while this check ran.
-        const history = readRelationships(accountId)?.history || [];
-        const record = { ...attempt, ...snapshot, pending: diff.pending, initializedAt: previous?.initializedAt || at,
-          checkedAt: at, nextCheckAt: at + RELATIONSHIP_INTERVAL, retryAfter: 0, failures: 0, error: '',
-          history: [...diff.events, ...history].slice(0, RELATIONSHIP_HISTORY_LIMIT) };
-        writeRelationships(accountId, record);
-        state.relationshipNextCheck = record.nextCheckAt;
-        state.relationshipStatus = previous?.initializedAt ? 'Check complete.' : 'Baseline saved. Future changes will appear here.';
-        notifyRelationships(diff.events);
-      } catch (error) {
-        if (controller.signal.aborted || loggedInAccountID() !== accountId) return;
-        const failures = (previous?.failures || 0) + 1;
-        const delay = error.rateLimited ? 60 * 60 * 1000 : Math.min(60 * 60 * 1000, RELATIONSHIP_INTERVAL * 2 ** Math.min(failures - 1, 2));
-        const retryAfter = Date.now() + delay;
-        const message = error.name === 'AbortError' ? 'Instagram took too long to respond. Your saved baseline was kept.' : error.message;
-        writeRelationships(accountId, { ...attempt, history: readRelationships(accountId)?.history || [], failures, retryAfter, nextCheckAt: retryAfter, error: message });
-        state.relationshipNextCheck = retryAfter;
-        state.relationshipStatus = message;
-        if (force) showToast(message);
-      }
-    };
-    try {
-      if (navigator.locks?.request) {
-        await navigator.locks.request(`${APP}:relationship-check:${accountId}`, { ifAvailable: true }, async lock => {
-          if (lock) await run();
-          else state.relationshipStatus = 'Another Instagram tab is checking relationships.';
-        });
-      } else {
-        // The persisted schedule still limits duplicate checks on older browsers.
-        await run();
-      }
-    } catch {
-      state.relationshipStatus = 'Could not save relationship history. Allow site storage or free some browser storage, then retry.';
-      state.relationshipNextCheck = Date.now() + RELATIONSHIP_INTERVAL;
-      if (force) showToast(state.relationshipStatus);
-    } finally {
-      state.relationshipRunning = false;
-      state.relationshipController = null;
-      updateRelationshipHistory();
-    }
-  }
-
+  function checkRelationships(force = false) { return force ? PAGE.__IGP_NATIVE_SOCIAL__?.check?.() : Promise.resolve(); }
   function relationshipTick() {
     const accountId = loggedInAccountID();
     if (accountId !== state.relationshipAccount) {
-      state.relationshipController?.abort();
       state.relationshipAccount = accountId;
-      state.relationshipNextCheck = 0;
-      state.relationshipStatus = '';
-      state.compareController?.abort();
-      state.mediaController?.abort();
-      removeModal('igp-media-modal');
-      removeModal('igp-viewer-modal');
-      removeModal('igp-follow-compare-modal');
+      state.compareController?.abort(); state.mediaController?.abort();
+      removeModal('igp-media-modal'); removeModal('igp-viewer-modal');
       scheduleScan();
-      state.root?.getElementById('igp-toasts')?.remove();
-      updateRelationshipHistory();
     }
-    if (!document.hidden && state.settings.relationshipNotifier && accountId && Date.now() >= state.relationshipNextCheck) void checkRelationships();
   }
 
   function updateRelationshipHistory() {
@@ -1353,7 +1032,7 @@
         <button class="igp-icon-btn" type="button" data-activity-desktop aria-label="Desktop alerts" title="Desktop alerts" aria-pressed="${state.settings.desktopNotifications}">${icon('bell',19)}</button>
         <button class="igp-icon-btn" type="button" data-activity-clear aria-label="Clear history" title="Clear history" ${events.length ? '' : 'disabled'}>${icon('trash',19)}</button>
       </div>
-      <details class="igp-help"><summary>How it works</summary><p>Checks run every 15 minutes while Instagram is visible. The first check saves a baseline. Missing accounts need two complete checks. A disappearance can also mean account removal, deactivation or blocking; Instagram does not tell us why.</p></details>
+      <details class="igp-help"><summary>How it works</summary><p>Complete lists loaded through Instagram are compared locally. The first check saves a baseline. Missing accounts need two complete checks. A disappearance can also mean account removal, deactivation or blocking; Instagram does not tell us why.</p></details>
       <div>${events.length ? events.map(event => `<a class="igp-event" href="/${encodeURIComponent(event.person.username)}/"><span>${escapeHTML(relationshipEventText(event))}</span><time>${escapeHTML(new Date(event.at).toLocaleString())}</time></a>`).join('') : '<div class="igp-empty">No changes recorded yet</div>'}</div>`;
     body.querySelector('[data-activity-check]').addEventListener('click', () => void checkRelationships(true));
     body.querySelector('[data-activity-clear]').addEventListener('click', () => {
@@ -1404,10 +1083,10 @@
     try {
       const url = new URL(href, location.origin);
       if (url.origin !== location.origin) return null;
-      let match = url.pathname.match(/^\/(?:[A-Za-z0-9_.]{1,30}\/)?(p|reel|reels)\/([A-Za-z0-9_-]{1,16})\/?$/);
+      let match = url.pathname.match(/^\/(?:[A-Za-z0-9_.]{1,30}\/)?(p|reel|reels)\/([A-Za-z0-9_-]{1,128})\/?$/);
       if (match) {
         const id = shortcodeToID(match[2]);
-        return id ? { kind: match[1] === 'p' ? 'post' : 'reel', id, code: match[2], key: `media:${id}` } : null;
+        return { kind: match[1] === 'p' ? 'post' : 'reel', id, code: match[2], key: `media:${id || match[2]}` };
       }
       match = url.pathname.match(/^\/stories\/([A-Za-z0-9_.]{1,30})(?:\/(\d+))?\/?$/);
       return match && match[1] !== 'highlights' ? { kind: 'story', id: match[2] || null, username: match[1], key: `story:${match[2] || match[1]}` } : null;
@@ -1511,9 +1190,11 @@
   }
 
   function matchMediaRecords(records, reference, fallback) {
-    if (reference.id) {
-      const record = records.find(record => record.media.pk === reference.id || reference.code && record.media.code === reference.code);
-      return record ? { items: mediaItems({ items: [record.media] },reference), fallback: false } : null;
+    if (reference.id || reference.code) {
+      const matches = records.filter(record => record.media.pk === reference.id || reference.code &&
+        (record.media.code === reference.code || !reference.id && record.media.code.length >= 11 && reference.code.startsWith(record.media.code)));
+      const record = matches.length === 1 ? matches[0] : null;
+      return record ? { items: mediaItems({ items: [record.media] },{...reference,id:record.media.pk}), fallback: false } : null;
     }
     if (reference.kind !== 'story' || !reference.username) return null;
     let stories = records.filter(record => record.story && normalizeUsername(record.owner) === normalizeUsername(reference.username));
@@ -1641,10 +1322,22 @@
       const fromDocument = matchMediaRecords(documentMediaRecords(),target.reference,fallback);
       if (fromDocument) return fromDocument;
     } catch { /* Expired or incomplete embedded metadata can be refreshed below. */ }
-    if (!target.reference.id && target.reference.kind !== 'story') {
+    const scope = target.scope || mediaSurface(target);
+    const carousel = !!scope?.querySelector('[aria-label*="next" i],[aria-label*="slide" i],button[title*="next" i]');
+    if (fallback && !carousel && !state.failedMediaURLs.has(fallback.url) && (fallback.kind === 'image' || !fallback.url.startsWith('blob:'))) {
+      return {items:[fallback],fallback:true};
+    }
+    if (!target.reference.id && !target.reference.code && target.reference.kind !== 'story') {
       if (signal.aborted) throw new DOMException('Download cancelled', 'AbortError');
-      if (fallback) return { items: [fallback], fallback: true };
+      if (fallback && (fallback.kind === 'image' || !fallback.url.startsWith('blob:'))) return { items: [fallback], fallback: true };
       throw new Error('Open this reel directly or wait for its video to load, then try again.');
+    }
+    try {
+      const fromPage = matchMediaRecords(await fetchMediaPage(target.reference,accountId,signal),target.reference,fallback);
+      if (fromPage) return fromPage;
+    } catch (error) {
+      if (signal.aborted || accountId !== loggedInAccountID()) throw new DOMException('Download cancelled','AbortError');
+      if (error.rateLimited) throw new Error('Instagram needs a break. Try again later.');
     }
     try {
       if (target.reference.id) {
@@ -1653,17 +1346,10 @@
       }
     } catch (error) {
       if (signal.aborted || accountId !== loggedInAccountID()) throw new DOMException('Download cancelled', 'AbortError');
-      if (error.rateLimited) throw new Error('Instagram is limiting requests. Please wait before retrying.');
-    }
-    try {
-      const fromPage = matchMediaRecords(await fetchMediaPage(target.reference,accountId,signal),target.reference,fallback);
-      if (fromPage) return fromPage;
-    } catch (error) {
-      if (signal.aborted || accountId !== loggedInAccountID()) throw new DOMException('Download cancelled','AbortError');
-      if (error.rateLimited) throw new Error('Instagram is limiting requests. Please wait before retrying.');
+      if (error.rateLimited) throw new Error('Instagram needs a break. Try again later.');
     }
     if (fallback && !state.failedMediaURLs.has(fallback.url) && (fallback.kind === 'image' || !fallback.url.startsWith('blob:'))) return { items: [fallback], fallback: true };
-    throw new Error('Instagram did not expose a downloadable file. Reload or open this item directly, then try again.');
+    throw new Error('Could not find the file. Open the post and try again.');
   }
 
   async function mediaExtension(blob, expectedKind) {
@@ -1707,7 +1393,7 @@
         handle = request({
           method: 'GET', url, responseType: 'blob', anonymous: true, timeout: MEDIA_TIMEOUT,
           onload: response => {
-            if (response.status < 200 || response.status >= 300) { if ([403,404].includes(response.status)) rememberFailedMediaURL(url); finish(new Error('The media link expired or is unavailable. Close this window and retry.')); return; }
+            if (response.status < 200 || response.status >= 300) { if ([403,404].includes(response.status)) rememberFailedMediaURL(url); finish(new Error('This download link expired. Try again.')); return; }
             if (response.finalUrl && !allowedMediaURL(response.finalUrl)) { finish(new Error('Unexpected media redirect.')); return; }
             const blob = response.response;
             if (!blob || typeof blob.slice !== 'function' || !blob.size || blob.size > MEDIA_LIMIT) { finish(new Error('The file is empty or exceeds the 250 MB download limit.')); return; }
@@ -1743,7 +1429,7 @@
       }
       if (!response.ok) {
         if ([403,404].includes(response.status)) rememberFailedMediaURL(url);
-        throw new Error('The media link expired or is unavailable. Close this window and retry.');
+        throw new Error('This download link expired. Try again.');
       }
       if (response.url && !allowedMediaURL(response.url)) throw new Error('Unexpected media redirect.');
       if (Number(response.headers.get('Content-Length')) > MEDIA_LIMIT) { controller.abort(); throw new Error('This file exceeds the 250 MB download limit.'); }
@@ -1815,7 +1501,7 @@
       const { items } = resolved;
       const note = document.createElement('div');
       note.className = 'igp-note'; note.setAttribute('role','status');
-      note.textContent = resolved.storyChoices ? `Choose a story · @${target.reference.username}` : resolved.fallback ? 'Visible item · displayed quality' : `${items.length} ${items.length === 1 ? 'item' : 'items'} · Original quality`;
+      note.textContent = resolved.storyChoices ? `Choose a story` : resolved.fallback ? 'Current photo or video' : `${items.length} ${items.length === 1 ? 'item' : 'items'}`;
       modal.body.replaceChildren(note);
       const actions = document.createElement('div'); actions.className = 'igp-actions igp-downloads'; modal.body.appendChild(actions);
       const buttons = [];
@@ -1839,10 +1525,10 @@
           for (const button of buttons) if (saved.has(Number(button.dataset.index))) {
             button.dataset.saved = 'true';
             button.querySelector('svg')?.remove(); button.insertAdjacentHTML('afterbegin',icon('check',18));
-            button.querySelector('span').textContent = `${items.length > 1 ? `${button.dataset.index} · ` : ''}Saved`;
+            button.querySelector('span').textContent = 'Saved';
           }
         } catch (error) {
-          if (!controller.signal.aborted) note.textContent = `${completed ? `${completed} file(s) sent. ` : ''}${error.name === 'AbortError' ? 'The download timed out. Close this window and retry.' : error.message}`;
+          if (!controller.signal.aborted) note.textContent = `${completed ? `${completed} saved. ` : ''}${error.name === 'AbortError' ? 'Download timed out. Try again.' : error.message}`;
         } finally { busy = false; buttons.forEach(button => { button.disabled = false; }); }
       };
       for (const item of items) {
@@ -1926,18 +1612,18 @@
   }
 
   const PLAYER_CSS = `
-    .igp-player{box-sizing:border-box;display:grid;gap:8px;padding:10px;border:1px solid var(--bd);border-radius:10px;background:var(--bg);color:var(--fg);font:12px/1.4 ${UI_FONT};width:280px;max-width:calc(100vw - 32px)}
-    .igp-player *{box-sizing:border-box}.igp-player .line{display:flex;align-items:center;gap:6px;min-width:0}.igp-player input[type=range]{min-width:0;width:100%;accent-color:#0095f6;cursor:pointer;height:20px;margin:0}.igp-player .time{margin-left:auto;font-variant-numeric:tabular-nums;white-space:nowrap;font-size:11px}
-    .igp-player button{border:0;background:transparent;color:inherit;display:grid;place-items:center;width:28px;height:28px;padding:4px;border-radius:5px;flex:0 0 auto;cursor:pointer}.igp-player button:hover{background:var(--soft2)}.igp-player button:disabled{opacity:.35;cursor:default}.igp-player select{color:inherit;background:var(--soft);border:1px solid var(--bd);border-radius:5px;padding:3px;font:inherit;width:65px}.igp-player [role=status]:empty{display:none}.igp-player [role=status]{font-size:11px}
+    .igp-player{box-sizing:border-box;display:grid;gap:8px;padding:12px;border:1px solid var(--bd);border-radius:16px;background:var(--bg);color:var(--fg);font:12px/1.4 ${UI_FONT};width:308px;max-width:calc(100vw - 32px)}
+    .igp-player *{box-sizing:border-box}.igp-player .line{display:flex;align-items:center;gap:6px;min-width:0}.igp-player input[type=range]{min-width:0;width:100%;accent-color:#0095f6;cursor:pointer;height:32px;margin:0}.igp-player .time{margin-left:auto;font-variant-numeric:tabular-nums;white-space:nowrap;font-size:11px}
+    .igp-player button{border:0;background:transparent;color:inherit;display:grid;place-items:center;width:36px;height:36px;padding:4px;border-radius:9px;flex:0 0 auto;cursor:pointer}.igp-player button:hover{background:var(--soft2)}.igp-player button:disabled{opacity:.35;cursor:default}.igp-player select{color:inherit;background:var(--soft);border:1px solid var(--bd);border-radius:9px;padding:5px;font:inherit;width:68px;min-height:36px}.igp-player [role=status]:empty{display:none}.igp-player [role=status]{font-size:11px}
   `;
 
   function makeVideoControls(video) {
     const element = document.createElement('div'); element.className='igp-player';
     element.setAttribute('role','group'); element.setAttribute('aria-label','Video controls');
-    const button=(action,label,name)=>`<button type="button" data-action="${action}" aria-label="${label}" title="${label}">${icon(name,18)}</button>`;
+    const button=(action,label,name)=>`<button type="button" data-action="${action}" aria-label="${label}" title="${label}" ${action==='step'?'style="width:auto;padding-inline:8px"':''}>${action === 'back' ? '−5' : action === 'forward' ? '+5' : action === 'step' ? 'Frame' : icon(name,18)}</button>`;
     element.innerHTML=`<input type="range" min="0" max="1" step="0.01" value="0" aria-label="Seek video" disabled>
       <div class="line">${button('play','Play','play')}${button('back','Back 5 seconds','previous')}${button('forward','Forward 5 seconds','next')}<select aria-label="Playback speed">${[0.25,0.5,0.75,1,1.25,1.5,1.75,2,2.5,3].map(n=>`<option value="${n}">${n}×</option>`).join('')}</select><span class="time"></span></div>
-      <div class="line">${button('mute','Unmute','volume')}<input type="range" min="0" max="1" step="0.01" aria-label="Volume">${button('step','Step 1/30 second','next')}${button('pip','Picture in picture','pip')}</div><span role="status"></span>`;
+      <div class="line">${button('mute','Unmute','volume')}<input type="range" min="0" max="1" step="0.01" aria-label="Volume">${button('step','Next frame','next')}${button('pip','Picture in picture','pip')}</div><span role="status"></span>`;
     const lifetime=new AbortController(), opts={signal:lifetime.signal};
     const seek=element.querySelector('[aria-label="Seek video"]'), volume=element.querySelector('[aria-label="Volume"]'), speed=element.querySelector('select');
     const play=element.querySelector('[data-action="play"]'), mute=element.querySelector('[data-action="mute"]'), pip=element.querySelector('[data-action="pip"]');
@@ -2001,7 +1687,7 @@
     const style=document.createElement('style');style.textContent=`${PLAYER_CSS}
       #igp-viewer-modal .igp-modal{width:min(1100px,calc(100vw - 24px));height:calc(100dvh - 40px);max-height:900px;display:flex;flex-direction:column}#igp-viewer-modal .igp-modal-body{padding:0;display:flex;flex:1;min-height:0;flex-direction:column;overflow:hidden}
       .igp-stage{position:relative;overflow:hidden;background:#101010;flex:1;min-height:120px;touch-action:none;outline-offset:-3px!important}.igp-stage img{position:absolute;left:50%;top:50%;max-width:none;max-height:none;user-select:none;pointer-events:none;transform-origin:center;will-change:transform}.igp-stage video{width:100%;height:100%;object-fit:contain}.igp-stage[data-zoomed=true]{cursor:grab}.igp-stage:active{cursor:grabbing}
-      .igp-viewer-tools{display:flex;align-items:center;justify-content:center;gap:5px;padding:7px;flex-wrap:wrap;border-top:1px solid var(--bd)}.igp-viewer-tools button{display:grid;place-items:center;border:0;border-radius:6px;background:transparent;padding:7px;min-width:32px;height:34px;color:inherit}.igp-viewer-tools button:hover{background:var(--soft)}.igp-viewer-count{font-size:12px;font-variant-numeric:tabular-nums;min-width:40px;text-align:center}#igp-viewer-modal .igp-player{width:100%;max-width:none;border:0;border-radius:0;padding:8px 14px}#igp-viewer-modal [hidden]{display:none!important}
+      .igp-viewer-tools{display:flex;align-items:center;justify-content:center;gap:5px;padding:7px;flex-wrap:wrap;border-top:1px solid var(--bd)}.igp-viewer-tools button{display:grid;place-items:center;border:0;border-radius:10px;background:transparent;padding:10px;min-width:44px;height:44px;color:inherit}.igp-viewer-tools button:hover{background:var(--soft)}.igp-viewer-count{font-size:12px;font-variant-numeric:tabular-nums;min-width:40px;text-align:center}#igp-viewer-modal .igp-player{width:100%;max-width:none;border:0;border-radius:0;padding:8px 14px}#igp-viewer-modal [hidden]{display:none!important}
       @media(max-width:480px){#igp-viewer-modal{padding:8px}#igp-viewer-modal .igp-modal{width:100%;height:calc(100dvh - 16px)}}`;
     modal.backdrop.appendChild(style);
     modal.body.innerHTML='<div class="igp-progress" role="status"><div class="igp-spinner"></div>Loading…</div>';
@@ -2242,12 +1928,14 @@
   }
 
   function scan() {
+    if (document.hidden) return;
     ensureRoot();
     syncTheme();
     handleURLChange();
     enhanceMediaDownloads();
     enhanceBioFonts();
     enhanceStoryViewerSearch();
+    PAGE.__IGP_SHELL_RECONCILE__?.();
   }
 
   function scheduleScan(delay = 80) {
@@ -2278,7 +1966,7 @@
     ensureRoot();
     installRouteWatcher();
     new MutationObserver(records => {
-      if (records.some(record => !record.target.closest?.('[data-igp-media-host],[data-igp-bio-toolbar-host]'))) scheduleScan(150);
+      if (records.some(record => !record.target.closest?.('[data-igp-media-host],[data-igp-bio-toolbar-host],[data-igp-host],#igp-web-root,#igp-v2-root'))) scheduleScan(150);
     })
       .observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['src', 'srcset', 'href', 'aria-label', 'hidden'] });
     const themeObserver = new MutationObserver(() => scheduleScan(0));
@@ -2328,28 +2016,56 @@
       if (event.key === 'Escape' && state.panelOpen) {
         state.panelOpen = false;
         renderPanel();
-        state.root.getElementById('igp-launcher').focus({preventScroll:true});
+
       }
     }, true);
 
-    document.addEventListener('click', event => {
-      const path = event.composedPath?.() || [];
-      if (state.root && path.includes(state.root.getElementById('igp-launcher'))) return;
-      if (state.panelOpen && !path.includes(state.rootHost)) {
-        state.panelOpen = false;
-        renderPanel();
-      }
-    }, true);
-
-    const keepInside = () => {
-      applyLauncherPosition();
-      if (state.panelOpen) positionPanel();
-    };
-    addEventListener('resize', keepInside);
-    window.visualViewport?.addEventListener('resize', keepInside);
-    window.visualViewport?.addEventListener('scroll', () => state.panelOpen && positionPanel());
+    addEventListener('resize', () => scheduleScan(100));
     scheduleScan(0);
   }
+
+  const legacyAPI = Object.freeze({
+    version: VERSION,
+    extractPerson, collectPeopleBatch, findBestScroller, relationshipDiff,
+    getSettings: () => ({ ...state.settings }),
+    setSetting(key, value) {
+      if (!Object.hasOwn(DEFAULTS, key) || typeof DEFAULTS[key] !== typeof value) return false;
+      if (state.settings[key] === value) return true;
+      state.settings[key] = value;
+      saveSettings();
+      cleanupDisabledFeatures();
+      if (key === 'relationshipNotifier') {
+        if (!value) state.relationshipController?.abort();
+        state.relationshipNextCheck = 0;
+      }
+      scheduleScan(0);
+      return true;
+    },
+    openFollowerComparison: () => runFollowerCompare(),
+    openFriendActivity: () => openRelationshipHistory(),
+    checkFriendActivity: () => checkRelationships(true),
+    readFriendActivity: () => {
+      const account = loggedInAccountID();
+      return account ? readRelationships(account) : null;
+    },
+    clearFriendActivity() {
+      const account = loggedInAccountID(), record = account ? readRelationships(account) : null;
+      if (!record) return false;
+      writeRelationships(account, { ...record, history: [] });
+      return true;
+    },
+    friendActivityText: relationshipEventText,
+    friendActivityStatus: () => state.relationshipStatus,
+    downloadCurrent() {
+      const target = currentMediaTarget();
+      if (target && mediaEnabled(target.reference)) return openMediaDownload(target);
+      showToast('Open a story, post or reel with downloads enabled.');
+      return null;
+    },
+    rescan: () => scheduleScan(0),
+  });
+  try { Object.defineProperty(PAGE, '__IGP_LEGACY_ENGINE__', { value: legacyAPI, configurable: false }); }
+  catch { PAGE.__IGP_LEGACY_ENGINE__ = legacyAPI; }
 
   if (document.documentElement) {
     boot();
@@ -2361,5 +2077,704 @@
       }
     }
     document.addEventListener('readystatechange', handleReadyState, false);
+  }
+})();
+
+// Instagram Plus Control Center and native social tools.
+(() => {
+  'use strict';
+  const PAGE = typeof unsafeWindow === 'undefined' ? window : unsafeWindow;
+  const pageFunction = fn => typeof exportFunction === 'function' ? exportFunction(fn, PAGE) : fn;
+  const APP = 'igp-web';
+  const VERSION = '2.4.0';
+  const SETTINGS_KEY = `${APP}:settings:v3`;
+  const OLD_SETTINGS_KEY = `${APP}:settings:v2`;
+  const DEFAULTS = Object.freeze({
+    postDownloads: true,
+    reelDownloads: true,
+    storyDownloads: true,
+    mediaViewer: true,
+    videoControls: true,
+    bioFonts: true,
+    viewerSearch: true,
+    relationshipNotifier: true,
+    desktopNotifications: false,
+    storyPreview: false,
+  });
+  const BOOLEAN_SETTINGS = new Set(Object.keys(DEFAULTS).filter(key => typeof DEFAULTS[key] === 'boolean'));
+
+  function clamp(value, min, max) { return Math.min(max, Math.max(min, value)); }
+  function sleep(ms, signal) {
+    return new Promise((resolve, reject) => {
+      if (signal?.aborted) return reject(new DOMException('Cancelled', 'AbortError'));
+      const timer = setTimeout(resolve, ms);
+      signal?.addEventListener('abort', () => { clearTimeout(timer); reject(new DOMException('Cancelled', 'AbortError')); }, { once: true });
+    });
+  }
+  function escapeHTML(value) {
+    return String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;');
+  }
+  function normalizeUsername(value) { return String(value || '').trim().replace(/^@/, '').toLocaleLowerCase(); }
+  function isVisible(element) {
+    if (!(element instanceof Element) || !element.isConnected) return false;
+    const rect = element.getBoundingClientRect(), style = getComputedStyle(element);
+    return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+  }
+  function viewport() {
+    const value = window.visualViewport;
+    return value ? { left: value.offsetLeft, top: value.offsetTop, width: value.width, height: value.height } : { left: 0, top: 0, width: innerWidth, height: innerHeight };
+  }
+  function debounce(fn, wait = 100) {
+    let timer = null;
+    const wrapped = (...args) => { clearTimeout(timer); timer = setTimeout(() => { timer = null; fn(...args); }, wait); };
+    wrapped.cancel = () => { clearTimeout(timer); timer = null; };
+    return wrapped;
+  }
+  function cookieValue(name) {
+    const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}=([^;]*)`));
+    return match ? decodeURIComponent(match[1]) : null;
+  }
+  function accountId() { return cookieValue('ds_user_id'); }
+  function parseJSON(value, fallback = null) { try { return JSON.parse(value); } catch { return fallback; } }
+  function readSettings() {
+    const current = parseJSON(localStorage.getItem(SETTINGS_KEY), null);
+    const previous = current || parseJSON(localStorage.getItem(OLD_SETTINGS_KEY), null) || {};
+    const next = {};
+    for (const [key, fallback] of Object.entries(DEFAULTS)) {
+      if (BOOLEAN_SETTINGS.has(key)) next[key] = typeof previous[key] === 'boolean' ? previous[key] : fallback;
+      else next[key] = fallback;
+    }
+    return next;
+  }
+
+  class EventBus {
+    constructor() { this.listeners = new Map(); }
+    on(type, listener, options = {}) {
+      if (!this.listeners.has(type)) this.listeners.set(type, new Set());
+      this.listeners.get(type).add(listener);
+      const off = () => this.listeners.get(type)?.delete(listener);
+      options.signal?.addEventListener('abort', off, { once: true });
+      return off;
+    }
+    emit(type, detail) {
+      for (const listener of [...(this.listeners.get(type) || [])]) {
+        try { listener(detail); } catch (error) { console.warn(`[Instagram Plus] ${type} listener failed`, error); }
+      }
+    }
+  }
+
+  class Scope {
+    constructor(name) { this.name = name; this.controller = new AbortController(); this.cleanups = []; }
+    get signal() { return this.controller.signal; }
+    listen(target, type, listener, options = {}) { target.addEventListener(type, listener, { ...options, signal: this.signal }); return listener; }
+    observe(observer, target, options) { observer.observe(target, options); this.cleanups.push(() => observer.disconnect()); return observer; }
+    cleanup(fn) { this.cleanups.push(fn); return fn; }
+    close() { if (this.signal.aborted) return; this.controller.abort(); for (const fn of this.cleanups.splice(0).reverse()) try { fn(); } catch {} }
+  }
+
+  const IGP = {
+    APP, VERSION, PAGE, pageFunction, DEFAULTS, SETTINGS_KEY,
+    state: {
+      settings: readSettings(), route: location.href, accountId: accountId(), routeScope: null,
+      rootHost: null, root: null, panelOpen: false, panelView: 'overview', modules: new Map(),
+    },
+    bus: new EventBus(),
+    util: { clamp, sleep, escapeHTML, normalizeUsername, isVisible, viewport, debounce, cookieValue, accountId, parseJSON, Scope },
+    saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(IGP.state.settings)); } catch {} IGP.bus.emit('settings:changed', { ...IGP.state.settings }); },
+    setSetting(key, value) {
+      if (!Object.hasOwn(DEFAULTS, key)) return;
+      if (BOOLEAN_SETTINGS.has(key)) value = !!value;
+      IGP.state.settings[key] = value; IGP.saveSettings();
+    },
+    register(name, module) { IGP.state.modules.set(name, module); },
+    runSafe(name, fn) { try { return fn(); } catch (error) { console.error(`[Instagram Plus] ${name}`, error); IGP.ui?.notice?.(`${name} stopped working on this page.`, { tone: 'error' }); return null; } },
+  };
+
+  {
+  const FONT = '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif';
+  const ICONS = Object.freeze({
+    logo: '<path d="M3 5h8M7 5v14M3 19h8M14 12h7m-3.5-3.5v7"/>',
+    home: '<path d="m3 11 9-8 9 8v10h-6v-6H9v6H3Z"/>',
+    social: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8m8-3v6m-3-3h6"/>',
+    time: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2m-8-9L4 2M17 5l3-3"/>',
+    settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a2 2 0 0 0 .4 2.2l.1.1-2.6 2.6-.1-.1a2 2 0 0 0-2.2-.4 2 2 0 0 0-1.2 1.8V21h-3.6v-.2A2 2 0 0 0 9 19a2 2 0 0 0-2.2.4l-.1.1-2.6-2.6.1-.1A2 2 0 0 0 4.6 15a2 2 0 0 0-1.8-1.2H2v-3.6h.8A2 2 0 0 0 4.6 9a2 2 0 0 0-.4-2.2l-.1-.1 2.6-2.6.1.1A2 2 0 0 0 9 4.6a2 2 0 0 0 1.2-1.8V2h3.6v.8A2 2 0 0 0 15 4.6a2 2 0 0 0 2.2-.4l.1-.1 2.6 2.6-.1.1A2 2 0 0 0 19.4 9a2 2 0 0 0 1.8 1.2h.8v3.6h-.8A2 2 0 0 0 19.4 15Z"/>',
+    close: '<path d="m6 6 12 12M18 6 6 18"/>', search: '<circle cx="10.5" cy="10.5" r="7.5"/><path d="m16 16 5 5"/>',
+    download: '<path d="M12 3v12m-5-5 5 5 5-5M4 19h16"/>', stack: '<rect x="6" y="6" width="15" height="15" rx="3"/><path d="M3 17V5a2 2 0 0 1 2-2h12"/>',
+    expand: '<path d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6"/>', sliders: '<path d="M4 6h16M4 12h16M4 18h16M8 3v6m8 0v6m-6 0v6"/>',
+    compare: '<path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4"/>', activity: '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/>',
+    chevron: '<path d="m9 5 7 7-7 7"/>', back: '<path d="m15 5-7 7 7 7"/>', check: '<path d="m5 12 4 4L19 6"/>',
+    trash: '<path d="M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15"/>', info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/>',
+    play: '<path d="m8 5 11 7-11 7Z"/>', pause: '<path d="M8 5v14M16 5v14"/>', pip: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 11h7v7h-7Z"/>',
+    volume: '<path d="M3 9h4l5-4v14l-5-4H3Zm13-1a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>', rotate: '<path d="M20 7a9 9 0 1 0 1 8M20 3v5h-5"/>',
+    plus: '<path d="M5 12h14M12 5v14"/>', minus: '<path d="M5 12h14"/>', shield: '<path d="M12 2 4 5v6c0 5 3.4 9 8 11 4.6-2 8-6 8-11V5Z"/>',
+    archive: '<path d="M4 7h16v14H4Zm-1-4h18v4H3Zm6 8h6"/>', refresh: '<path d="M20 7a9 9 0 1 0 1 8M20 3v5h-5"/>', bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M9 21h6"/>',
+  });
+  function icon(name, size = 22) {
+    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ICONS.logo}</svg>`;
+  }
+  const UI_CSS = `
+    :host{--bg:#fff;--surface:#fff;--soft:#f5f5f5;--soft-hover:#ededed;--text:#161616;--muted:#666;--line:#e6e6e6;--accent:#006fc4;--danger:#d82e3f;--inverse:#fff;--shadow:0 12px 48px #0002;color-scheme:light;font:14px/1.45 ${FONT}}
+    :host([data-theme=dark]){--bg:#000;--surface:#161616;--soft:#232323;--soft-hover:#303030;--text:#fafafa;--muted:#adadad;--line:#353535;--accent:#53b5ff;--danger:#ff7684;--inverse:#161616;--shadow:0 12px 48px #0007;color-scheme:dark}
+    *{box-sizing:border-box;font-family:${FONT}}button,input,select{font:inherit}button{color:inherit}a{color:inherit}.hidden,[hidden]{display:none!important}
+    button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+    #igp-edge{position:fixed;right:0;top:42%;z-index:2147483645;pointer-events:auto;display:flex;align-items:center;gap:8px;height:44px;padding:0 12px;border:1px solid var(--line);border-right:0;border-radius:12px 0 0 12px;background:var(--surface);color:var(--text);box-shadow:var(--shadow);cursor:pointer;font-weight:650;transform:translateX(calc(100% - 44px));transition:transform .16s ease}
+    #igp-edge:hover,#igp-edge:focus-visible{transform:none}#igp-edge svg{flex:none}
+    #igp-nav-entry{pointer-events:auto;width:100%;min-width:48px;height:48px;display:flex;align-items:center;gap:16px;padding:0 13px;border:0;border-radius:9px;background:transparent;color:var(--text);cursor:pointer;font:500 16px/1 ${FONT};white-space:nowrap}
+    #igp-nav-entry:hover{background:var(--soft)}#igp-nav-entry svg{flex:none}#igp-nav-entry span{overflow:hidden}
+    dialog{font:14px/1.45 ${FONT};color:var(--text)}
+    #igp-center{position:fixed;inset:24px 24px auto auto;width:min(440px,calc(100vw - 48px));max-width:none;max-height:calc(100dvh - 48px);margin:0;padding:0;border:1px solid var(--line);border-radius:22px;background:var(--surface);box-shadow:var(--shadow);overflow:hidden;pointer-events:auto;animation:igpUp .16s ease}
+    #igp-center::backdrop{background:#0004}.center-shell{display:flex;flex-direction:column;max-height:calc(100dvh - 50px)}
+    .center-head{display:flex;align-items:center;justify-content:space-between;padding:16px 18px 10px;flex:none}.brand{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:700;letter-spacing:-.35px}.brand-mark{display:grid;place-items:center;width:36px;height:36px;border:1px solid var(--line);border-radius:11px;background:var(--soft)}
+    .icon-button{display:grid;place-items:center;width:44px;height:44px;flex:none;border:0;border-radius:12px;background:transparent;cursor:pointer}.icon-button:hover{background:var(--soft)}.icon-button:disabled{opacity:.4;cursor:default}
+    .center-nav{display:flex;gap:4px;margin:0 20px 4px;padding:4px;background:var(--soft);border-radius:12px;flex:none}.nav-button{display:flex;align-items:center;justify-content:center;gap:8px;min-height:40px;flex:1;border:0;border-radius:9px;background:transparent;color:var(--muted);cursor:pointer;font-size:13px;font-weight:600}.nav-button.active{color:var(--text);background:var(--surface);box-shadow:0 1px 4px #0001}.nav-button svg{width:17px;height:17px}
+    .center-body{min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}.view{padding:20px 20px 24px}.view-title{margin:4px 0 16px;font-size:23px;letter-spacing:-.6px;line-height:1.2}.view-title:focus{outline:none}.view-copy{margin:0 0 16px;color:var(--muted);font-size:13px;line-height:1.5}.section{margin:24px 0 0}.section:first-child{margin-top:0}.section-title{margin:0 0 10px;color:var(--muted);font-size:12px;font-weight:600;letter-spacing:.01em}
+    .card{border:1px solid var(--line);border-radius:16px;background:var(--surface);overflow:hidden}.card+.card{margin-top:12px}.row{display:flex;align-items:center;gap:12px;min-height:58px;padding:12px 16px;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--text);text-align:left;width:100%;text-decoration:none}.row:last-child{border-bottom:0}.row.action,.setting-row{cursor:pointer}.row.action:hover,.setting-row:hover{background:var(--soft)}.setting-row:focus-within{outline:2px solid var(--accent);outline-offset:-3px}.row-icon{display:grid;place-items:center;width:36px;height:36px;border-radius:11px;background:var(--soft);flex:none}.row-main{min-width:0;flex:1}.row-title{display:block;font-size:14px;font-weight:550}.row-detail{display:block;margin-top:3px;color:var(--muted);font-size:12px;line-height:1.4}.row-tail{color:var(--muted);flex:none}
+    .quick-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.quick{display:flex;flex-direction:column;align-items:flex-start;gap:16px;min-height:108px;border:1px solid var(--line);border-radius:16px;background:var(--surface);padding:16px;color:var(--text);cursor:pointer;text-align:left;font-size:14px}.quick:hover{background:var(--soft)}.quick strong{font-size:14px;font-weight:600;line-height:1.35}.quick svg{width:23px;height:23px}
+    .download-action{display:flex;align-items:center;gap:14px;width:100%;min-height:68px;padding:16px;border:0;border-radius:16px;background:var(--text);color:var(--inverse);text-align:left;cursor:pointer}.download-action:hover{opacity:.88}.download-action strong{font-size:14px;font-weight:600;flex:1}.download-action svg:last-child{width:17px;height:17px;opacity:.6}.story-note{margin:10px 2px 0;font-size:12px;color:var(--muted)}
+    .switch{position:relative;width:44px;height:26px;flex:none}.switch input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}.switch .track{display:block;width:100%;height:100%;border-radius:20px;background:#8b8b8b;transition:background .15s;pointer-events:none}.switch .track:before{content:"";position:absolute;width:20px;height:20px;left:3px;top:3px;border-radius:50%;background:white;box-shadow:0 1px 3px #0003;transition:transform .15s}.switch input:checked+.track{background:var(--accent)}.switch input:checked+.track:before{transform:translateX(18px)}.switch input:focus-visible{outline:none}
+    .setting-row .setting-state{color:var(--muted);font-size:11px;min-width:20px;text-align:right}.setting-row:has(input:checked) .setting-state{color:var(--accent)}
+    .field{width:100%;height:44px;border:1px solid var(--line);border-radius:12px;background:var(--soft);color:var(--text);padding:0 14px}.field::placeholder{color:var(--muted);opacity:1}.tabs{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;border-bottom:1px solid var(--line);margin-top:16px}.tab{display:flex;align-items:center;justify-content:center;gap:7px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--muted);min-height:52px;padding:10px 8px;cursor:pointer;font-weight:600;font-size:12px;line-height:1.35}.tab.active{border-color:var(--text);color:var(--text)}.count{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:7px;background:var(--soft);font-size:11px;flex:none}
+    .toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}.toolbar .field{min-width:120px;flex:1}.button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:44px;padding:0 16px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--text);cursor:pointer;font-weight:600}.button:hover{background:var(--soft)}.button.primary{border-color:var(--text);background:var(--text);color:var(--inverse)}.button.danger{color:var(--danger)}.button:disabled{opacity:.4;cursor:default}
+    .empty,.loading,.error{padding:40px 20px;text-align:center;color:var(--muted)}.loading:before{content:"";display:block;width:23px;height:23px;margin:0 auto 12px;border:2px solid var(--line);border-top-color:var(--text);border-radius:50%;animation:igpSpin .7s linear infinite}.error{color:var(--danger)}.list-note{margin:14px 20px 0;padding:12px;border-radius:12px;background:var(--soft);color:var(--muted);font-size:12px;line-height:1.5}
+    .person{display:grid;grid-template-columns:40px 1fr auto;gap:12px;align-items:center;min-height:64px;padding:10px 20px;color:inherit;text-decoration:none}.person:hover{background:var(--soft)}.person img,.avatar{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;object-fit:cover;background:var(--soft);color:var(--muted);font-size:14px;font-weight:600}.person strong,.person small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.person strong{font-weight:550}.person small{color:var(--muted)}.about{display:flex;justify-content:space-between;gap:10px;margin-top:28px;color:var(--muted);font-size:11px}
+    #igp-notices{position:fixed;left:50%;bottom:max(24px,env(safe-area-inset-bottom));z-index:2147483647;transform:translateX(-50%);width:min(380px,calc(100vw - 32px));pointer-events:none}.notice{display:flex;align-items:center;gap:10px;width:100%;margin-top:8px;padding:14px 16px;border:1px solid #ffffff20;border-radius:14px;background:#262626;color:white;box-shadow:var(--shadow);pointer-events:auto;animation:igpUp .16s ease}.notice.error{background:#a82332}.notice span{flex:1}.notice button{min-height:44px;border:0;border-radius:8px;background:#ffffff20;color:white;padding:5px 12px;cursor:pointer}
+    .igp-menu{position:fixed;z-index:2147483647;width:250px;margin:0;padding:6px;border:1px solid var(--line);border-radius:16px;background:var(--surface);color:var(--text);box-shadow:var(--shadow);pointer-events:auto}.igp-menu button{display:flex;align-items:center;gap:11px;width:100%;min-height:44px;border:0;border-radius:10px;background:transparent;padding:10px;color:inherit;cursor:pointer;text-align:left}.igp-menu button:hover{background:var(--soft)}
+    .confirm{width:min(390px,calc(100vw - 32px));border:1px solid var(--line);border-radius:20px;background:var(--surface);color:var(--text);padding:0;box-shadow:var(--shadow);pointer-events:auto}.confirm::backdrop{background:#0007}.confirm-body{padding:24px}.confirm h2{margin:0 0 10px;font-size:19px;letter-spacing:-.3px}.confirm p{margin:0;color:var(--muted)}.confirm-actions{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--line)}.confirm-actions button{min-height:52px;border:0;border-right:1px solid var(--line);background:transparent;padding:14px;cursor:pointer}.confirm-actions button:hover{background:var(--soft)}.confirm-actions button:last-child{border:0}.confirm-actions .danger{color:var(--danger);font-weight:650}
+    @keyframes igpUp{from{transform:translateY(6px);opacity:0}}@keyframes igpSpin{to{transform:rotate(360deg)}}
+    @media(max-width:560px){#igp-center{inset:auto 0 0;width:100vw;max-height:calc(100dvh - 12px);border-radius:22px 22px 0 0;border-bottom:0}.center-shell{max-height:calc(100dvh - 13px)}.center-body{padding-bottom:env(safe-area-inset-bottom)}.center-head{padding-top:14px}.view{padding:18px 20px 24px}#igp-edge{top:auto;bottom:76px}}
+    @media(max-width:340px){.view{padding-inline:14px}.center-nav{margin-inline:14px}.quick{padding:12px}.row{padding-inline:12px}.row-title{font-size:13px}.tab{font-size:11px}.count{min-width:18px;padding:0 4px}}
+    @media(prefers-reduced-motion:reduce){*,*:before{animation:none!important;transition:none!important}}
+`;
+
+  const views = new Map();
+  let viewScope = null, nativeHost = null, menu = null, menuOutside = null, returnFocus = null;
+  function themeValue() {
+    const value = getComputedStyle(document.body || document.documentElement).getPropertyValue('--ig-primary-background').trim();
+    const rgb = value.match(/\d+(?:\.\d+)?/g)?.slice(0, 3).map(Number);
+    if (rgb?.length === 3) return rgb.reduce((sum, part) => sum + part, 0) / 3 < 128 ? 'dark' : 'light';
+    return getComputedStyle(document.body || document.documentElement).backgroundColor.match(/\d+/g)?.slice(0, 3).reduce((sum, value) => sum + Number(value), 0) / 3 < 128 ? 'dark' : 'light';
+  }
+  function syncTheme() {
+    const theme = themeValue(); if (IGP.state.rootHost) IGP.state.rootHost.dataset.theme = theme;
+    for (const host of document.querySelectorAll('[data-igp-host]')) host.dataset.theme = theme;
+  }
+  function ensureRoot() {
+    if (IGP.state.root?.isConnected) return IGP.state.root;
+    const host = document.createElement('div'); host.id = 'igp-v2-root'; host.style.cssText = 'position:fixed;inset:0;z-index:2147483645;pointer-events:none';
+    const root = host.attachShadow({ mode: 'open' }); root.innerHTML = `<style>${UI_CSS}</style><button id="igp-edge" type="button" aria-label="Open Instagram Plus">${icon('logo')}<span>Instagram Plus</span></button><div id="igp-notices" aria-live="polite"></div>`;
+    document.documentElement.appendChild(host); IGP.state.rootHost = host; IGP.state.root = root; syncTheme();
+    root.getElementById('igp-edge').addEventListener('click', () => openCenter());
+    return root;
+  }
+  function tryNativeLauncher() {
+    ensureRoot();
+    if (nativeHost?.isConnected) {
+      nativeHost.dataset.compact = String(nativeHost.getBoundingClientRect().width < 110);
+      return;
+    }
+    const visibleLinks = [...document.querySelectorAll('a[href],[role=link][href]')].filter(IGP.util.isVisible);
+    const pathOf = element => { try { return new URL(element.href || element.getAttribute('href'), location.origin).pathname; } catch { return ''; } };
+    const home = visibleLinks.find(element => pathOf(element) === '/'), reels = visibleLinks.find(element => /^\/reels?\/?$/.test(pathOf(element))), messages = visibleLinks.find(element => pathOf(element) === '/direct/inbox/');
+    let nav = null;
+    if (home && reels && messages) {
+      for (let candidate = home.parentElement, depth = 0; candidate && depth < 12; candidate = candidate.parentElement, depth++) {
+        const rect = candidate.getBoundingClientRect();
+        if (rect.height > 220 && rect.width >= 48 && rect.width <= 330 && candidate.contains(reels) && candidate.contains(messages)) { nav = candidate; break; }
+      }
+    }
+    if (!nav && home && reels && messages) nav = [...document.querySelectorAll('nav,[role=navigation]')].find(element => { const rect = element.getBoundingClientRect(); return IGP.util.isVisible(element) && rect.height > 220 && rect.width <= 330 && element.contains(home) && element.contains(reels) && element.contains(messages); }) || null;
+    if (!nav || nav.getBoundingClientRect().width < 48) { IGP.state.root.getElementById('igp-edge').hidden = false; return; }
+    const navRect = nav.getBoundingClientRect(), anchors = [...nav.querySelectorAll('a[href],[role=link][href]')].filter(IGP.util.isVisible).filter(element => { const rect = element.getBoundingClientRect(), center = rect.left + rect.width / 2; return center >= navRect.left && center <= navRect.right; }).sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
+    const reserved = new Set(['explore', 'reels', 'reel', 'direct', 'stories', 'accounts']), messagesTop = messages.getBoundingClientRect().top;
+    const profile = anchors.find(element => { const parts = pathOf(element).split('/').filter(Boolean), label = `${element.getAttribute('aria-label') || ''} ${element.querySelector('img')?.alt || ''}`; return parts.length === 1 && !reserved.has(parts[0].toLowerCase()) && /profile picture|^\s*profile\s*$/i.test(label) && element.getBoundingClientRect().top > messagesTop; });
+    const reference = profile || (nav.contains(messages) && anchors.includes(messages) ? messages : anchors.at(-1));
+    const parent = reference?.parentElement;
+    if (!parent || parent.closest('[data-igp-native-launcher]')) return;
+    nativeHost = document.createElement('span'); nativeHost.dataset.igpNativeLauncher = '1'; nativeHost.dataset.igpHost = '1'; nativeHost.style.cssText = 'display:block;width:100%;color:inherit';
+    const shadow = nativeHost.attachShadow({ mode: 'open' }); shadow.innerHTML = `<style>${UI_CSS}:host([data-compact=true]) #igp-nav-entry span{display:none}</style><button id="igp-nav-entry" type="button" aria-label="Instagram Plus" title="Instagram Plus">${icon('logo',25)}<span>Instagram Plus</span></button>`;
+    shadow.querySelector('button').addEventListener('click', () => openCenter()); parent.insertAdjacentElement('afterend', nativeHost);
+    IGP.state.root.getElementById('igp-edge').hidden = true; syncTheme();
+    nativeHost.dataset.compact = String(nativeHost.getBoundingClientRect().width < 110);
+  }
+  function registerView(id, config) { views.set(id, config); }
+  function renderNavigation() {
+    const center = IGP.state.root?.getElementById('igp-center'); if (!center) return;
+    const nav = center.querySelector('.center-nav');
+    nav.innerHTML = [...views].filter(([, value]) => value.nav !== false).map(([id, value]) => `<button class="nav-button ${(IGP.state.panelView === id || (id === 'overview' && IGP.state.panelView === 'social')) ? 'active' : ''}" data-view="${id}" aria-current="${IGP.state.panelView === id || (id === 'overview' && IGP.state.panelView === 'social') ? 'page' : 'false'}" type="button">${icon(value.icon || 'home', 20)}<span>${IGP.util.escapeHTML(value.label)}</span></button>`).join('');
+    nav.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => { const id=button.dataset.view; showView(id); center.querySelector(`[data-view="${id}"]`)?.focus(); }));
+  }
+  function showView(id, params = null) {
+    const view = views.get(id); if (!view) return;
+    IGP.state.panelView = id; IGP.state.panelParams = params; viewScope?.close(); viewScope = new IGP.util.Scope(`view:${id}`);
+    const center = IGP.state.root?.getElementById('igp-center'); if (!center) return openCenter(id, params);
+    const activeScope = viewScope; renderNavigation(); const body = center.querySelector('.center-body'); body.scrollTop = 0; body.replaceChildren();
+    try { const result = view.render(body, activeScope, params); if (result?.catch) result.catch(error => { if (!activeScope.signal.aborted) body.innerHTML = `<div class="error">${IGP.util.escapeHTML(error.message || 'Could not open this page.')}</div>`; }); const heading=body.querySelector('h1'); if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});} else center.querySelector('.nav-button.active')?.focus({preventScroll:true}); }
+    catch (error) { body.innerHTML = `<div class="error">${IGP.util.escapeHTML(error.message || 'This view could not load.')}</div>`; }
+  }
+  function closeCenter() {
+    const center = IGP.state.root?.getElementById('igp-center'); if (!center) return;
+    IGP.state.panelOpen = false; viewScope?.close(); viewScope = null; closeMenu(); if (center.open) center.close(); center.remove(); const target = returnFocus; returnFocus = null; if (target?.isConnected) requestAnimationFrame(() => target.focus({ preventScroll: true }));
+  }
+  function openCenter(id = IGP.state.panelView || 'overview', params = null) {
+    ensureRoot(); let center = IGP.state.root.getElementById('igp-center');
+    if (!center) {
+      returnFocus = nativeHost?.shadowRoot?.activeElement || IGP.state.root.activeElement || document.activeElement;
+      center = document.createElement('dialog'); center.id = 'igp-center'; center.setAttribute('aria-label', 'Instagram Plus');
+      center.innerHTML = `<div class="center-shell"><header class="center-head"><div class="brand"><span class="brand-mark">${icon('logo',24)}</span>Instagram Plus</div><button class="icon-button" type="button" aria-label="Close">${icon('close')}</button></header><nav class="center-nav" aria-label="Instagram Plus sections"></nav><main class="center-body"></main></div>`;
+      IGP.state.root.appendChild(center); center.querySelector('[aria-label=Close]').addEventListener('click', closeCenter); center.addEventListener('cancel', event => { event.preventDefault(); closeCenter(); }); center.addEventListener('click', event => { if (event.target === center) closeCenter(); });
+      center.showModal();
+    }
+    IGP.state.panelOpen = true; showView(id, params); center.querySelector('[aria-label=Close]').focus({ preventScroll: true });
+  }
+  function notice(message, { tone = 'normal', action = null, duration = 7000 } = {}) {
+    ensureRoot(); const region = IGP.state.root.getElementById('igp-notices'), item = document.createElement('div'); item.className = `notice ${tone === 'error' ? 'error' : ''}`;
+    item.innerHTML = `<span>${IGP.util.escapeHTML(message)}</span>${action ? `<button type="button">${IGP.util.escapeHTML(action.label)}</button>` : ''}`;
+    if (action) item.querySelector('button').addEventListener('click', () => { item.remove(); action.run(); }); region.appendChild(item); setTimeout(() => item.remove(), duration); return item;
+  }
+  function confirmAction({ title, message, confirmLabel = 'Delete', danger = true }) {
+    ensureRoot(); return new Promise(resolve => {
+      const dialog = document.createElement('dialog'); dialog.className = 'confirm'; dialog.setAttribute('aria-label',title);
+      dialog.innerHTML = `<div class="confirm-body"><h2>${IGP.util.escapeHTML(title)}</h2><p>${IGP.util.escapeHTML(message)}</p></div><div class="confirm-actions"><button type="button" data-result="false">Cancel</button><button type="button" data-result="true" class="${danger ? 'danger' : ''}">${IGP.util.escapeHTML(confirmLabel)}</button></div>`;
+      IGP.state.root.appendChild(dialog); let finished = false; const finish = value => { if (finished) return; finished = true; if (dialog.open) dialog.close(); dialog.remove(); resolve(value); };
+      dialog.querySelectorAll('[data-result]').forEach(button => button.addEventListener('click', () => finish(button.dataset.result === 'true'))); dialog.addEventListener('cancel', event => { event.preventDefault(); finish(false); }); dialog.showModal(); dialog.querySelector('[data-result=false]').focus();
+    });
+  }
+  function closeMenu() { if (menuOutside) { document.removeEventListener('pointerdown', menuOutside, true); menuOutside = null; } if (!menu) return; if (typeof menu.hidePopover === 'function' && menu.matches(':popover-open')) menu.hidePopover(); menu.remove(); menu = null; }
+  function openMenu(anchor, items) {
+    ensureRoot(); closeMenu(); menu = document.createElement('div'); menu.className = 'igp-menu'; menu.setAttribute('role', 'menu');
+    menu.innerHTML = items.map((item, index) => `<button type="button" data-index="${index}" role="menuitem">${icon(item.icon || 'chevron', 19)}<span>${IGP.util.escapeHTML(item.label)}</span></button>`).join('');
+    IGP.state.root.appendChild(menu); const rect = anchor.getBoundingClientRect(), vp = IGP.util.viewport(); menu.style.left = `${IGP.util.clamp(rect.right - 250, vp.left + 8, vp.left + vp.width - 258)}px`; menu.style.top = `${IGP.util.clamp(rect.bottom + 7, vp.top + 8, vp.top + vp.height - menu.offsetHeight - 8)}px`;
+    menu.querySelectorAll('button').forEach(button => button.addEventListener('click', () => { const item = items[Number(button.dataset.index)]; closeMenu(); item.run(); }));
+    menu.addEventListener('keydown',event=>{ const buttons=[...menu.querySelectorAll('button')],index=buttons.indexOf(IGP.state.root.activeElement); if(event.key==='Escape'){event.preventDefault();closeMenu();anchor.focus();} else if(['ArrowDown','ArrowUp','Home','End'].includes(event.key)){event.preventDefault();const next=event.key==='Home'?0:event.key==='End'?buttons.length-1:(index+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;buttons[next]?.focus();} });
+    menuOutside = event => { if (!event.composedPath().includes(menu) && !event.composedPath().includes(anchor)) closeMenu(); }; document.addEventListener('pointerdown', menuOutside, true); menu.querySelector('button')?.focus();
+  }
+  function switchRow(key, title, detail = '') {
+    const checked = IGP.state.settings[key];
+    return `<label class="row setting-row"><span class="row-main"><span class="row-title">${IGP.util.escapeHTML(title)}</span>${detail ? `<span class="row-detail">${IGP.util.escapeHTML(detail)}</span>` : ''}</span><span class="setting-state" aria-hidden="true">${checked ? 'On' : 'Off'}</span><span class="switch"><input type="checkbox" data-setting="${key}" ${checked ? 'checked' : ''}><span class="track"></span></span></label>`;
+  }
+  function bindSettings(container) {
+    container.querySelectorAll('[data-setting]').forEach(input => input.addEventListener('change', async () => {
+      if(input.dataset.setting==='desktopNotifications' && input.checked){
+        input.disabled=true;
+        try { if(typeof Notification==='undefined' || await Notification.requestPermission()!=='granted') throw new Error(); }
+        catch { input.checked=false;notice('Allow notifications in your browser first.'); }
+        finally { input.disabled=false; }
+      }
+      IGP.setSetting(input.dataset.setting, input.checked);
+      input.closest('label').querySelector('.setting-state').textContent = input.checked ? 'On' : 'Off';
+      const note = container.querySelector('[data-story-note]');
+      if (note) note.hidden = !IGP.state.settings.storyPreview;
+    }));
+  }
+  function actionRow({ icon: name, title, detail = '', id = '' }) { return `<button class="row action" type="button" ${id ? `data-action="${id}"` : ''}><span class="row-icon">${icon(name, 19)}</span><span class="row-main"><span class="row-title">${IGP.util.escapeHTML(title)}</span>${detail ? `<span class="row-detail">${IGP.util.escapeHTML(detail)}</span>` : ''}</span><span class="row-tail">${icon('chevron', 17)}</span></button>`; }
+  function storyNote() { return `<p class="story-note" data-story-note ${IGP.state.settings.storyPreview ? '' : 'hidden'}>Some story views may still be counted.</p>`; }
+  function renderOverview(body) {
+    const path = location.pathname;
+    const download = /^\/stories\//.test(path) ? 'Download story' : /^\/reels?\//.test(path) ? 'Download reel' : /^\/(?:[^/]+\/)?p\//.test(path) ? 'Download post' : 'Download open photo or video';
+    body.innerHTML = `<div class="view"><section class="section"><h2 class="section-title">While browsing</h2><div class="card">${switchRow('storyPreview','Story Preview','Hide your story views')}${switchRow('videoControls','Video controls')}${switchRow('mediaViewer','Photo zoom')}</div>${storyNote()}</section><section class="section"><h2 class="section-title">Save</h2><button class="download-action" type="button" data-action="download">${icon('download',24)}<strong>${download}</strong>${icon('chevron',17)}</button></section><section class="section"><h2 class="section-title">Followers</h2><div class="quick-grid"><button class="quick" type="button" data-action="compare">${icon('compare')}<strong>Compare followers</strong></button><button class="quick" type="button" data-action="activity">${icon('activity')}<strong>Friend Activity</strong></button></div></section></div>`;
+    bindSettings(body);
+    body.querySelector('[data-action=compare]').addEventListener('click', () => showView('social', {compare:true}));
+    body.querySelector('[data-action=activity]').addEventListener('click', () => showView('social', {activity:true}));
+    body.querySelector('[data-action=download]').addEventListener('click', () => IGP.legacy.launch('downloadCurrent'));
+  }
+  function renderSettings(body) {
+    body.innerHTML = `<div class="view"><section class="section"><h2 class="section-title">Browsing</h2><div class="card">${switchRow('storyPreview','Story Preview','Hide your story views')}${switchRow('videoControls','Video controls')}${switchRow('mediaViewer','Photo zoom')}${switchRow('viewerSearch','Search story viewers')}</div>${storyNote()}</section><section class="section"><h2 class="section-title">Download buttons</h2><div class="card">${switchRow('storyDownloads','Stories')}${switchRow('reelDownloads','Reels')}${switchRow('postDownloads','Posts')}</div></section><section class="section"><h2 class="section-title">Follow changes</h2><div class="card">${switchRow('relationshipNotifier','Friend Activity')}${switchRow('desktopNotifications','Desktop notifications')}</div></section><section class="section"><h2 class="section-title">Profile</h2><div class="card">${switchRow('bioFonts','Bio fonts')}</div></section><footer class="about"><span>Made by Jasermomm</span><span>Version ${VERSION}</span></footer></div>`;
+    bindSettings(body);
+  }
+
+  registerView('overview', { label: 'Tools', icon: 'sliders', render: renderOverview });
+  registerView('social', { label: 'Social', nav: false, render: body => body.innerHTML = '<div class="loading">Loading followers</div>' });
+  registerView('settings', { label: 'Settings', icon: 'settings', render: renderSettings });
+  IGP.ui = { icon, UI_CSS, ensureRoot, syncTheme, tryNativeLauncher, registerView, openCenter, closeCenter, showView, notice, confirm: confirmAction, openMenu, closeMenu, switchRow, bindSettings, actionRow, views };
+  }
+
+  {
+  const SNAPSHOT_TTL = 6 * 60 * 60 * 1000;
+  const HISTORY_LIMIT = 200;
+  const nativeState = { running: false, controller: null, dialog: null, progressHost: null, observed: null };
+  const engine = () => PAGE.__IGP_LEGACY_ENGINE__;
+  const cacheKey = account => `${APP}:native-social:v1:${account}`;
+  const abortError = () => new DOMException('Cancelled', 'AbortError');
+  function profileName(href) {
+    try {
+      const url = new URL(href, location.origin), parts = url.pathname.split('/').filter(Boolean);
+      const reserved = new Set(['accounts','explore','reels','reel','stories','direct','api','graphql','archive','notifications']);
+      return url.origin === location.origin && parts.length === 1 && /^[\w.]{1,30}$/.test(parts[0]) && !reserved.has(parts[0]) ? parts[0].toLowerCase() : null;
+    } catch { return null; }
+  }
+  function exactCount(text, kind) {
+    const word = kind === 'followers' ? 'followers?' : 'following';
+    const match = String(text || '').replace(/\u00a0|\u202f/g, ' ').match(new RegExp(`(?:^|\\s)([\\d, .]+)\\s+${word}(?:\\s|$)`, 'i'));
+    if (!match || /\d[.,]\d{1,2}(?:\s|$)/.test(match[1].trim())) return null;
+    const number = Number(match[1].replace(/[, .]/g, ''));
+    return Number.isSafeInteger(number) && number >= 0 ? number : null;
+  }
+  function validPeople(map) {
+    return map && typeof map === 'object' && !Array.isArray(map) && Object.entries(map).every(([key,p]) => key === `u:${IGP.util.normalizeUsername(p?.username)}` && /^[\w.]{1,30}$/.test(p?.username || ''));
+  }
+  function readRecord(account = IGP.util.accountId()) {
+    const record = IGP.util.parseJSON(localStorage.getItem(cacheKey(account)), null);
+    if (record?.schema !== 1 || record.accountId !== account || !validPeople(record.followers) || !validPeople(record.following) || !Number.isFinite(record.checkedAt)) return null;
+    record.pending = { followers: validPeople(record.pending?.followers) ? record.pending.followers : {}, following: validPeople(record.pending?.following) ? record.pending.following : {} };
+    record.history = Array.isArray(record.history) ? record.history.filter(e => e && ['followers','following'].includes(e.kind) && ['added','removed'].includes(e.change) && /^[\w.]{1,30}$/.test(e.person?.username || '') && Number.isFinite(e.at)).slice(0,HISTORY_LIMIT) : [];
+    return record;
+  }
+  function saveSnapshot(account, lists, at = Date.now()) {
+    if (account !== IGP.util.accountId()) throw abortError();
+    const previous = readRecord(account), tracking = IGP.state.settings.relationshipNotifier;
+    const baseline = previous?.trackingSince ? { ...previous, initializedAt: previous.trackingSince } : null;
+    const diff = tracking ? engine().relationshipDiff(baseline, lists, at) : { events:[], pending:{followers:{},following:{}} };
+    const record = { schema:1, accountId:account, followers:lists.followers, following:lists.following, checkedAt:at,
+      trackingSince: tracking ? previous?.trackingSince || at : 0, pending:diff.pending,
+      history:[...diff.events,...(previous?.history || [])].slice(0,HISTORY_LIMIT), source:'native-lists' };
+    // No partial result is written. A storage failure remains visible to callers.
+    localStorage.setItem(cacheKey(account), JSON.stringify(record));
+    IGP.bus.emit('social:snapshot', record);
+    if (diff.events.length) {
+      const message = diff.events.length === 1 ? eventText(diff.events[0]) : `${diff.events.length} relationship changes`;
+      IGP.ui.notice(message, { action:{label:'View',run:()=>IGP.ui.openCenter('social',{activity:true})} });
+      if (IGP.state.settings.desktopNotifications && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        try { new Notification('Instagram Plus · Friend Activity', {body:message,tag:`${APP}-relationships`}); } catch {}
+      }
+    }
+    return { ...record, fetchedAt:at, cached:false };
+  }
+  function eventText(event) {
+    const name = `@${event.person.username}`;
+    return event.kind === 'followers'
+      ? event.change === 'added' ? `${name} now follows you` : `${name} no longer follows you`
+      : event.change === 'added' ? `You now follow ${name}` : `You no longer follow ${name}`;
+  }
+  function readCached() {
+    const record = readRecord();
+    const partial = IGP.util.parseJSON(localStorage.getItem(`${cacheKey(IGP.util.accountId())}:available`),null);
+    if (partial?.accountId === IGP.util.accountId() && validPeople(partial.followers) && validPeople(partial.following) && Number.isFinite(partial.fetchedAt) && partial.fetchedAt > (record?.checkedAt || 0)) return {...partial,cached:true,stale:Date.now()-partial.fetchedAt>SNAPSHOT_TTL};
+    return record ? {...record, fetchedAt:record.checkedAt, cached:true, stale:Date.now()-record.checkedAt > SNAPSHOT_TTL} : null;
+  }
+  function countControl(kind) {
+    const candidates = [...document.querySelectorAll('a[href],button,[role="button"]')];
+    for (const element of candidates) {
+      if (!IGP.util.isVisible(element) || element.closest('[data-igp-host],#igp-web-root,#igp-v2-root,[role="dialog"]')) continue;
+      const text = `${element.getAttribute('aria-label') || ''} ${element.textContent || ''}`;
+      if (!new RegExp(`\\b${kind}\\b`, 'i').test(text)) continue;
+      const title = element.getAttribute('title') || element.querySelector('[title]')?.getAttribute('title');
+      const count = title && /^\d[\d, .]*$/.test(title) ? Number(title.replace(/[, .]/g,'')) : exactCount(text,kind);
+      if (Number.isSafeInteger(count) && count >= 0) return {element,count};
+    }
+    return null;
+  }
+  function ownProfile() {
+    return !!document.querySelector('a[href^="/accounts/edit"]') && !!profileName(location.href);
+  }
+  function profileLink() {
+    return [...document.querySelectorAll('a[href]')].find(a => {
+      if (!profileName(a.href) || !IGP.util.isVisible(a)) return false;
+      const rect = a.getBoundingClientRect(), label = a.getAttribute('aria-label') || a.querySelector('img')?.alt || '';
+      return rect.left < 330 && /profile picture|^profile$/i.test(label) && !a.closest('main,article,[role="main"],[role="dialog"]');
+    });
+  }
+  function visibleDialog(kind) {
+    return [...document.querySelectorAll('[role="dialog"]')].find(d => IGP.util.isVisible(d) &&
+      [...d.querySelectorAll('[role="heading"],h1,h2')].some(h => h.textContent.trim().toLowerCase() === kind));
+  }
+  function closeDialog(dialog) {
+    if (!dialog?.isConnected) return;
+    const glyph = dialog.querySelector('[aria-label="Close" i]');
+    const button = glyph?.closest('button,[role="button"]');
+    if (button) button.click();
+  }
+  async function waitUntil(check, signal, timeout = 15000) {
+    const end = Date.now()+timeout;
+    while (Date.now()<end) {
+      if (signal.aborted) throw abortError();
+      const value = check(); if (value) return value;
+      await IGP.util.sleep(160,signal);
+    }
+    throw new Error('Instagram is taking too long to load. Try again.');
+  }
+  function progress(message) {
+    nativeState.progressHost?.querySelector('[data-progress]')?.replaceChildren(document.createTextNode(message));
+  }
+  function mountProgress() {
+    IGP.ui.ensureRoot();
+    const host = document.createElement('div');
+    host.className = 'notice'; host.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);width:min(390px,calc(100vw - 24px));z-index:2147483647;pointer-events:auto';
+    host.innerHTML = '<span data-progress>Opening your profile</span><button type="button">Cancel</button>';
+    host.querySelector('button').addEventListener('click',cancel);
+    IGP.state.root.appendChild(host); nativeState.progressHost=host;
+  }
+  async function readList(kind, expected, account, signal) {
+    const map = new Map();
+    if (expected === 0) return {people:{},complete:true,expected};
+    const control = countControl(kind); if (!control || control.count !== expected) throw new Error('Your follower counts changed. Try again.');
+    if ([...document.querySelectorAll('[role="dialog"]')].some(IGP.util.isVisible)) throw new Error('Close the open Instagram dialog, then try again.');
+    control.element.click();
+    const dialog = await waitUntil(()=>visibleDialog(kind),signal);
+    nativeState.dialog=dialog;
+    try {
+      let noGrowth = 0, last = -1, scroller = null;
+      const end = Date.now()+180000;
+      while (Date.now()<end) {
+        if (signal.aborted || account !== IGP.util.accountId()) throw abortError();
+        if (!dialog.isConnected) throw new Error('The list was closed. Try again.');
+        const input = dialog.querySelector('input');
+        if (input?.value) throw new Error('Clear the search in Instagram’s follower list first.');
+        engine().collectPeopleBatch(dialog,map);
+        progress(`${kind === 'followers' ? 'Followers' : 'Following'} ${map.size} of ${expected}`);
+        if (map.size > expected) throw new Error('Your follower counts changed. Try again.');
+        const people = () => Object.fromEntries([...map.values()].map(p=>[`u:${p.key}`,{id:`u:${p.key}`,username:p.username,displayName:p.displayName,avatar:p.avatar,href:p.href}]));
+        if (map.size === expected) return {people:people(),complete:true,expected};
+        scroller = scroller?.isConnected ? scroller : engine().findBestScroller(dialog);
+        if (scroller) {
+          // Scroll in visible increments; wait between pagination triggers.
+          scroller.scrollTop = Math.min(scroller.scrollHeight-scroller.clientHeight,scroller.scrollTop+Math.max(120,scroller.clientHeight*.8));
+          scroller.dispatchEvent(new Event('scroll',{bubbles:true}));
+        }
+        noGrowth = map.size === last ? noGrowth+1 : 0; last=map.size;
+        if (noGrowth >= 14) {
+          const bottom = scroller && scroller.scrollTop+scroller.clientHeight >= scroller.scrollHeight-8;
+          if (bottom && map.size > 0 && !dialog.querySelector('[role="progressbar"],[aria-busy="true"]')) return {people:people(),complete:false,expected};
+          throw new Error(`Instagram loaded ${map.size} of ${expected} ${kind}. Try again.`);
+        }
+        await IGP.util.sleep(900,signal);
+      }
+      throw new Error('The list took too long to load. Try again.');
+    } finally { closeDialog(dialog); if (nativeState.dialog === dialog) nativeState.dialog=null; }
+  }
+  async function collectNative() {
+    const account = IGP.util.accountId();
+    if (!account) throw new Error('Sign in to Instagram to compare followers.');
+    if (nativeState.running) throw new Error('A comparison is already running.');
+    nativeState.running=true; const controller=new AbortController(); nativeState.controller=controller;
+    mountProgress();
+    const run = async () => {
+      if (!ownProfile()) {
+        const link = profileLink(); if (!link) throw new Error('Open your own Instagram profile and try Compare again.');
+        link.click(); await waitUntil(ownProfile,controller.signal);
+      }
+      const totals=await waitUntil(()=>{const a=countControl('followers'),b=countControl('following');return a&&b?{followers:a.count,following:b.count}:null;},controller.signal);
+      const followers=await readList('followers',totals.followers,account,controller.signal);
+      await IGP.util.sleep(600,controller.signal);
+      const following=await readList('following',totals.following,account,controller.signal);
+      if (countControl('followers')?.count !== totals.followers || countControl('following')?.count !== totals.following) throw new Error('Your follower counts changed. Try again.');
+      if (followers.complete && following.complete) {
+        localStorage.removeItem(`${cacheKey(account)}:available`);
+        return saveSnapshot(account,{followers:followers.people,following:following.people});
+      }
+      const available = {schema:1,accountId:account,fetchedAt:Date.now(),followers:followers.people,following:following.people,
+        complete:{followers:followers.complete,following:following.complete},expected:totals,partial:true,cached:false};
+      // Incomplete observations can support qualified comparisons, never removals.
+      localStorage.setItem(`${cacheKey(account)}:available`,JSON.stringify(available));
+      return available;
+    };
+    try {
+      return navigator.locks?.request ? await navigator.locks.request(`${APP}:native-list-check:${account}`,{ifAvailable:true},lock=>{if(!lock)throw new Error('Another Instagram tab is comparing. Wait for it to finish.');return run();}) : await run();
+    } finally {
+      closeDialog(nativeState.dialog); nativeState.dialog=null;
+      nativeState.progressHost?.remove();nativeState.progressHost=null;
+      nativeState.running=false;nativeState.controller=null;
+    }
+  }
+  function cancel() { nativeState.controller?.abort(); }
+  function clearHistory() {
+    const account=IGP.util.accountId(),record=readRecord(account);if(!record)return;
+    localStorage.setItem(cacheKey(account),JSON.stringify({...record,history:[]}));
+  }
+  function observeLoadedList() {
+    if (nativeState.running || !IGP.state.settings.relationshipNotifier || !ownProfile()) return;
+    const kind = visibleDialog('followers') ? 'followers' : visibleDialog('following') ? 'following' : null;
+    if (!kind) { nativeState.observed=null; return; }
+    const dialog=visibleDialog(kind),account=IGP.util.accountId(),expected=countControl(kind)?.count;
+    if (!account || expected == null || dialog.querySelector('input')?.value) return;
+    if (nativeState.observed?.dialog !== dialog) nativeState.observed={dialog,kind,map:new Map()};
+    const observed=nativeState.observed;engine().collectPeopleBatch(dialog,observed.map);
+    if (observed.map.size !== expected) return;
+    // Complete lists observed during normal use update a local draft only.
+    const key=`${APP}:native-list-draft:v1:${account}`;
+    const draft=IGP.util.parseJSON(localStorage.getItem(key),{}) || {};
+    const people=Object.fromEntries([...observed.map.values()].map(p=>[`u:${p.key}`,{id:`u:${p.key}`,username:p.username,displayName:p.displayName,avatar:p.avatar,href:p.href}]));
+    const signature=JSON.stringify(people);
+    if (observed.savedSignature === signature) return;
+    draft[kind]={people,at:Date.now(),expected};localStorage.setItem(key,JSON.stringify(draft));observed.savedSignature=signature;
+    const other=kind==='followers'?'following':'followers';
+    if (draft[other] && validPeople(draft[other].people) && Date.now()-draft[other].at < 5*60*1000 && Object.keys(draft[other].people).length === countControl(other)?.count) {
+      saveSnapshot(account,{[kind]:people,[other]:draft[other].people});
+      localStorage.removeItem(key);
+    }
+  }
+  IGP.social={collectNative,readCached,readRecord,saveSnapshot,clearHistory,eventText,cancel,observeLoadedList,exactCount,profileName,validPeople,state:nativeState};
+  PAGE.__IGP_NATIVE_SOCIAL__={openComparison:()=>IGP.ui.openCenter('social',{compare:true}),check:collectNative};
+  }
+
+  {
+  function legacyEngine() { return PAGE.__IGP_LEGACY_ENGINE__ || null; }
+
+  function syncLegacySettings(settings = IGP.state.settings) {
+    const engine = legacyEngine();
+    if (!engine) return;
+    const existing = engine.getSettings();
+    for (const [key, value] of Object.entries(settings)) if (existing[key] !== value) engine.setSetting(key, value);
+  }
+
+  function launchLegacy(method) {
+    const engine = legacyEngine();
+    if (!engine || typeof engine[method] !== 'function') {
+      IGP.ui.notice('Still loading. Try again in a moment.', { tone: 'error' });
+      return;
+    }
+    IGP.ui.closeCenter();
+    requestAnimationFrame(() => {
+      try {
+        const result = engine[method]();
+        result?.catch?.(error => IGP.ui.notice(error?.message || 'The action could not be completed.', { tone: 'error' }));
+      } catch (error) {
+        IGP.ui.notice(error?.message || 'The action could not be completed.', { tone: 'error' });
+      }
+    });
+  }
+
+  function renderPeople(container, people) {
+    container.innerHTML = people.length ? people.map(person => `<a class="person" href="/${encodeURIComponent(person.username)}/"><span class="avatar" aria-hidden="true">${IGP.util.escapeHTML(person.username.slice(0,1).toUpperCase())}</span><span><strong>@${IGP.util.escapeHTML(person.username)}</strong></span><span class="row-tail">${IGP.ui.icon('chevron', 16)}</span></a>`).join('') : '<div class="empty">No accounts found</div>';
+  }
+
+  function drawComparison(body, scope, result) {
+    const groups = [
+      { label: result.complete?.followers === false ? 'May not follow you' : "Don't follow you", people: Object.values(result.following).filter(person => !Object.hasOwn(result.followers, person.id)) },
+      { label: result.complete?.following === false ? 'You may not follow' : "You don't follow", people: Object.values(result.followers).filter(person => !Object.hasOwn(result.following, person.id)) },
+    ];
+    groups.forEach(group => group.people.sort((a, b) => a.username.localeCompare(b.username)));
+    body.innerHTML = `<div class="view" style="padding-inline:0"><div style="padding:0 20px"><div class="toolbar"><button class="icon-button" type="button" data-back aria-label="Back">${IGP.ui.icon('back')}</button><span style="flex:1"></span><button class="button" type="button" data-refresh>${IGP.ui.icon('refresh',17)} Refresh</button></div><h1 class="view-title">Compare followers</h1><p class="view-copy">Checked ${IGP.util.escapeHTML(new Date(result.fetchedAt).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}))}</p><input class="field" type="search" placeholder="Search accounts" aria-label="Search accounts"></div><div class="tabs">${groups.map((group, index) => `<button class="tab ${index ? '' : 'active'}" data-tab="${index}" aria-pressed="${!index}" type="button"><span>${IGP.util.escapeHTML(group.label)}</span><span class="count">${group.people.length}</span></button>`).join('')}</div><div data-results aria-live="polite"></div></div>`;
+    if (result.partial) {
+      const warning = document.createElement('p'); warning.className='list-note'; warning.setAttribute('role','status');
+      const counts = ['followers','following'].filter(kind=>result.complete?.[kind] === false).map(kind=>`${Object.keys(result[kind]).length} of ${result.expected[kind]} ${kind}`);
+      warning.textContent=`Instagram showed ${counts.join(' and ')}. Some matches may be missing.`;
+      body.querySelector('.tabs').before(warning);
+    }
+    let active = 0;
+    const input = body.querySelector('input'), output = body.querySelector('[data-results]');
+    const draw = () => {
+      const query = input.value.trim().toLocaleLowerCase();
+      renderPeople(output, groups[active].people.filter(person => person.username.toLocaleLowerCase().includes(query)));
+    };
+    body.querySelector('[data-back]').addEventListener('click', () => IGP.ui.showView('overview'), { signal: scope.signal });
+    body.querySelector('[data-refresh]').addEventListener('click', () => void renderComparison(body, scope, true), { signal: scope.signal });
+    input.addEventListener('input', draw, { signal: scope.signal });
+    body.querySelectorAll('[data-tab]').forEach(button => button.addEventListener('click', () => {
+      active = Number(button.dataset.tab);
+      body.querySelectorAll('[data-tab]').forEach(tab => { tab.classList.toggle('active', tab === button); tab.setAttribute('aria-pressed', String(tab === button)); });
+      input.value = '';
+      draw();
+    }, { signal: scope.signal }));
+    draw();
+  }
+
+  async function refreshSocial(mode = 'compare') {
+    if (IGP.social.state.running) return;
+    IGP.ui.closeCenter();
+    try {
+      const result = await IGP.social.collectNative();
+      IGP.ui.openCenter('social', mode === 'compare' ? {compare:true,result} : {activity:true});
+    } catch (error) {
+      IGP.ui.openCenter('social', mode === 'compare' ? {compare:true,error:error?.message || 'Could not compare followers.'} : {activity:true});
+      if (mode !== 'compare') IGP.ui.notice(error?.message || 'The check stopped.', {tone:'error'});
+    }
+  }
+  function renderComparison(body, scope, force = false, params = null) {
+    const result = params?.result || (!force && IGP.social.readCached());
+    if (result) return drawComparison(body, scope, result);
+    body.innerHTML = `<div class="view"><button class="icon-button" type="button" data-back aria-label="Back">${IGP.ui.icon('back')}</button><h1 class="view-title">Compare followers</h1>${params?.error ? `<div class="error">${IGP.util.escapeHTML(params.error)}</div>` : '<div class="loading">Loading followers</div>'}<button class="button primary" type="button" data-load>Try again</button></div>`;
+    body.querySelector('[data-back]').addEventListener('click',()=>IGP.ui.showView('overview'),{signal:scope.signal});
+    body.querySelector('[data-load]').addEventListener('click',()=>void refreshSocial(),{signal:scope.signal});
+    if (force || !params?.error) queueMicrotask(()=>{if(!scope.signal.aborted)void refreshSocial();});
+  }
+
+  function renderActivity(body, scope) {
+    const record = IGP.social.readRecord(), events = Array.isArray(record?.history) ? record.history : [];
+    const pending = Object.values(record?.pending || {}).reduce((sum, value) => sum + Object.keys(value).length, 0);
+    const status = !IGP.util.accountId() ? 'Sign in to check followers' : !IGP.state.settings.relationshipNotifier ? 'Friend Activity is off' : record?.trackingSince ? 'Following changes' : 'Check followers to start';
+    body.innerHTML = `<div class="view"><button class="icon-button" type="button" data-back aria-label="Back">${IGP.ui.icon('back')}</button><h1 class="view-title">Friend Activity</h1><div class="card">${IGP.ui.switchRow('relationshipNotifier','Track follow changes')}<div class="row"><span class="row-main"><span class="row-title">${IGP.util.escapeHTML(status)}</span><span class="row-detail">${record?.checkedAt ? `Checked ${IGP.util.escapeHTML(new Date(record.checkedAt).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}))}` : 'Not checked yet'}${pending ? `<br>${pending} ${pending === 1 ? 'change needs' : 'changes need'} another check` : ''}</span></span></div><div class="row"><button class="button" data-check type="button" ${!IGP.util.accountId() || !IGP.state.settings.relationshipNotifier ? 'disabled' : ''}>${IGP.ui.icon('refresh', 17)} Check followers</button><button class="button" data-alerts type="button" aria-label="Desktop alerts" aria-pressed="${IGP.state.settings.desktopNotifications}">${IGP.ui.icon('bell', 19)} Alerts</button></div></div><section class="section"><div class="toolbar"><h2 class="section-title" style="flex:1;margin:0">History</h2><button class="button" data-clear type="button" ${events.length ? '' : 'disabled'}>Clear history</button></div><div class="card">${events.length ? events.map(event => `<a class="row action" href="/${encodeURIComponent(event.person.username)}/"><span class="row-icon">${IGP.ui.icon(event.change === 'added' ? 'plus' : 'minus', 18)}</span><span class="row-main"><span class="row-title">${IGP.util.escapeHTML(IGP.social.eventText(event))}</span><span class="row-detail">${IGP.util.escapeHTML(new Date(event.at).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}))}</span></span></a>`).join('') : '<div class="empty">No changes yet</div>'}</div></section></div>`;
+    IGP.ui.bindSettings(body);
+    body.querySelector('[data-setting=relationshipNotifier]').addEventListener('change', () => { IGP.ui.showView('social',{activity:true}); body.querySelector('[data-setting=relationshipNotifier]')?.focus(); }, {signal:scope.signal});
+    body.querySelector('[data-back]').addEventListener('click', () => IGP.ui.showView('overview'), { signal: scope.signal });
+    body.querySelector('[data-check]')?.addEventListener('click', async event => {
+      event.currentTarget.disabled = true;
+      try { await refreshSocial('activity'); }
+      catch (error) { IGP.ui.notice(error?.message || 'The check could not finish.', { tone: 'error' }); }
+      if (!scope.signal.aborted) IGP.ui.showView('social',{activity:true});
+    }, { signal: scope.signal });
+    body.querySelector('[data-clear]')?.addEventListener('click', async () => {
+      if (!await IGP.ui.confirm({ title: 'Clear history?', message: 'Your saved follow changes will be deleted.', confirmLabel: 'Clear history' })) return;
+      IGP.social.clearHistory();
+      if (!scope.signal.aborted) IGP.ui.showView('social',{activity:true});
+    }, { signal: scope.signal });
+    body.querySelector('[data-alerts]')?.addEventListener('click', async () => {
+      if (IGP.state.settings.desktopNotifications) IGP.setSetting('desktopNotifications', false);
+      else {
+        try {
+          const permission = await Notification.requestPermission();
+          if (permission !== 'granted') throw new Error();
+          IGP.setSetting('desktopNotifications', true);
+        } catch { IGP.ui.notice('Allow notifications in your browser first.', { tone: 'error' }); }
+      }
+      if (!scope.signal.aborted) IGP.ui.showView('social',{activity:true});
+    }, { signal: scope.signal });
+  }
+
+  function renderSocial(body, scope, params) {
+    if (params?.compare) return renderComparison(body, scope, false, params);
+    if (params?.activity) return renderActivity(body, scope);
+    IGP.ui.showView('overview');
+  }
+
+  IGP.ui.registerView('social', { label: 'Social', nav: false, render: renderSocial });
+  IGP.bus.on('settings:changed', syncLegacySettings);
+  IGP.legacy = { engine: legacyEngine, syncSettings: syncLegacySettings, launch: launchLegacy };
+  }
+
+  {
+  const appState = { started: false };
+  const reconcileSoon = IGP.util.debounce(reconcile, 100);
+  function checkRoute() {
+    if (location.href !== IGP.state.route) {
+      IGP.state.routeScope?.close();
+      IGP.state.routeScope = new IGP.util.Scope(`route:${location.pathname}`);
+      IGP.state.route = location.href;
+      IGP.bus.emit('route:changed', { current: location.href });
+    }
+    const account = IGP.util.accountId();
+    if (account !== IGP.state.accountId) {
+      IGP.social.cancel();
+      IGP.state.accountId = account;
+      IGP.bus.emit('account:changed', account);
+    }
+  }
+  function reconcile() {
+    if (!document.documentElement || document.hidden) return;
+    checkRoute();
+    IGP.runSafe('Interface', () => {
+      IGP.ui.ensureRoot(); IGP.ui.tryNativeLauncher(); IGP.ui.syncTheme();
+    });
+    IGP.runSafe('Friend Activity', () => IGP.social.observeLoadedList());
+  }
+  function boot() {
+    if (appState.started) return;
+    appState.started = true;
+    IGP.state.routeScope = new IGP.util.Scope(`route:${location.pathname}`);
+    IGP.ui.ensureRoot(); IGP.legacy.syncSettings(); reconcile();
+    // Share the established engine's filtered observer and SPA route watcher.
+    PAGE.__IGP_SHELL_RECONCILE__ = reconcileSoon;
+    window.addEventListener('resize', reconcileSoon, { passive: true });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) reconcileSoon(); });
+    window.addEventListener('pagehide', () => { IGP.social.cancel(); reconcileSoon.cancel(); });
+    window.addEventListener('storage', event => {
+      if (event.key !== SETTINGS_KEY || !event.newValue) return;
+      IGP.state.settings = readSettings();
+      IGP.bus.emit('settings:changed', { ...IGP.state.settings });
+    });
+    IGP.bus.on('settings:changed', reconcileSoon);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
+  else boot();
+  IGP.app = { boot, reconcile, checkRoute, state: appState };
   }
 })();
