@@ -1,27 +1,38 @@
 # Instagram Plus
 
-Instagram Plus adds handy tools to Instagram in your browser. Its small movable **IG+ circle** opens settings, follower comparison and Friend Activity. Media actions sit beside Instagram's post, reel and story controls.
+Download posts, reels, and stories. Compare followers, track follow changes, and get better media controls.
+
+**Version 2.4.0. Made by Jasermomm.**
 
 ## Features
 
-- **Quick media downloads:** one click saves a single photo or video. For a carousel, choose an item or save the whole set. A visible reel can also be downloaded when its link is not in the address bar.
-- **Story downloads:** save the current story, or use **Download all stories** in the story header to save available stories from the account you are viewing. Photos and videos are saved in order. If your browser asks, allow multiple downloads.
-- **Zoomable media viewer:** open a photo, video or carousel in a larger viewer; zoom photos with the controls, mouse wheel or pinch, drag to pan, rotate, fit to screen, and move between carousel items. Download an individual item from the viewer.
-- **Extra video controls:** seek through a video, skip five seconds, adjust playback speed from 0.25× to 3× and change volume. Step forward by 1/30 second while paused. Speed and volume are remembered; Instagram's mute state is preserved. Picture-in-picture is available when the browser supports it.
-- **Follower comparison:** compare both complete lists to see accounts you follow that do not follow you back, and followers you do not follow back. Search either list.
-- **Friend Activity alerts:** keep a local history of follow and unfollow changes for your account. Checks run about every 15 minutes while Instagram is visible; the first check creates a baseline, and a disappearance is confirmed on two complete checks. Check now, clear the history or turn on optional desktop alerts in the Activity window.
-- **Story viewer search:** search names in the story viewer list and see which viewers liked the story when that information is available.
-- **Bio fonts:** apply a styled Unicode font to selected bio text or to the full bio while editing your profile. Available styles include serif, sans-serif, script, monospace, Fraktur, fullwidth and circled text.
-- **Story Preview:** optionally try to avoid marking a story as seen. This is off by default and Instagram changes can affect it, so anonymous viewing is not guaranteed.
-- **Movable IG+ menu:** use the launcher to turn features on or off. The launcher can be dragged, and IG+ windows follow Instagram's light or dark appearance.
+- **Download media:** save photos, videos, reels, and stories. Download one carousel item or the whole carousel, and save all available stories from an account at once.
+- **Compare followers:** see who doesn't follow you back and who you don't follow. Search either list.
+- **Friend Activity:** keep a history of follow and unfollow changes, with optional desktop alerts. Use **Check followers** to update it. Missing accounts need two complete checks before a removal is recorded.
+- **Photo zoom:** zoom, pan, rotate, and fit photos to your screen. Use your mouse wheel or pinch, browse carousel items, and download from the viewer.
+- **Video controls:** skip forward or back, seek, change speed and volume, step through paused frames, and use Picture-in-Picture. Your playback preferences are remembered.
+- **Story Preview:** try to view stories without marking them as seen. Off by default. Some views may still be counted.
+- **Search story viewers:** find viewers by name and see story likes when Instagram shows them.
+- **Bio fonts:** style selected text or your whole bio.
 
 ## Install
 
-1. Install [Tampermonkey](https://www.tampermonkey.net/) in your browser.
-2. Open [instagram-plus-web.user.js](instagram-plus-web.user.js) and copy its contents.
-3. Create a new Tampermonkey script, replace the editor contents with the copied code, and save.
-4. Open or reload [Instagram](https://www.instagram.com/).
+1. Install [Tampermonkey](https://www.tampermonkey.net/).
+2. Install [Instagram Plus from Greasy Fork](https://greasyfork.org/en/scripts/590249), or paste `instagram-plus-web.user.js` into a new Tampermonkey script and save.
+3. Reload [Instagram](https://www.instagram.com/). Keep only one copy of Instagram Plus enabled.
 
-To update, replace the contents of your existing script with the latest file, save, and reload Instagram. Keep only one copy enabled.
+## Use
 
-Made by **Jasermomm**.
+Open **Instagram Plus** in Instagram's sidebar. **Tools** has the quick switches, downloads, and follower tools. **Settings** lets you choose which features appear. If the sidebar isn't available, use the tab on the right edge.
+
+Media controls sit beside Instagram's own buttons. The menu follows Instagram's light or dark mode and fits small screens.
+
+Your browser may ask to allow multiple downloads. Comparison tells you when Instagram hasn't shown every account. Desktop alerts and Picture-in-Picture need browser support and permission.
+
+## What's new in 2.4.0
+
+- Redesigned menu with just **Tools** and **Settings**.
+- Story Preview, video controls, and photo zoom are one tap away.
+- Shorter labels and less clutter throughout the app.
+- Better layouts for small screens, clearer switches, and improved keyboard controls.
+- Matching dialogs and media controls, with clearer video skip and frame buttons.
